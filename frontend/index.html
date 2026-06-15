@@ -443,6 +443,57 @@
         .markdown ul, .markdown ol { padding-left: 22px; margin-bottom: 8px; }
         .markdown li { margin-bottom: 4px; }
 
+        .status-carousel {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            width: 100%;
+            min-width: 0;
+        }
+        .ripple-dot {
+            position: relative;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: currentColor;
+            flex-shrink: 0;
+        }
+        .ripple-dot::before,
+        .ripple-dot::after {
+            content: "";
+            position: absolute;
+            inset: -7px;
+            border: 1px solid currentColor;
+            border-radius: 50%;
+            opacity: .55;
+            animation: ripple 1.7s ease-out infinite;
+        }
+        .ripple-dot::after {
+            animation-delay: .65s;
+        }
+        @keyframes ripple {
+            0% { transform: scale(.45); opacity: .55; }
+            80%,100% { transform: scale(1.75); opacity: 0; }
+        }
+        .status-message {
+            color: var(--text-primary);
+            font-weight: 600;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .status-phase {
+            color: currentColor;
+            border: 1px solid rgba(6,182,212,.35);
+            background: rgba(6,182,212,.1);
+            border-radius: 999px;
+            padding: 1px 8px;
+            font-size: 11px;
+            white-space: nowrap;
+            margin-left: auto;
+        }
+
         .typing-cursor::after {
             content: '▊';
             color: var(--accent);
@@ -576,6 +627,15 @@ const state = {
     sentenceSpanIndex: null,
     findingCardIndex: null,
     issueSidSet: null,
+    intent: null,
+    plan: null,
+    stepStatus: new Map(),
+    currentAgentMessage: '',
+    currentAgentPhase: '',
+    agentStatusActive: false,
+    statusQueue: [],
+    statusQueueTimer: null,
+    lastAgentStatusAt: 0,
 
     eventSource: null,
     startTime: null,
@@ -611,6 +671,8 @@ const dom = {
 // ============================================================
 // Helpers
 // ============================================================
+const MIN_AGENT_STATUS_MS = 1500;
+
 function escapeHtml(s) {
     return String(s)
         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -624,6 +686,72 @@ function setStatus(text, classMod) {
     else if (classMod === 'error')     icon = '<span>❌</span>';
     else if (classMod === 'cancelled') icon = '<span>⏸</span>';
     dom.statusStrip.innerHTML = `${icon}<span style="${!classMod?'opacity:.6':''}">${escapeHtml(text)}</span>`;
+}
+function setAgentStatus(message, phase, classMod = 'running') {
+    state.agentStatusActive = true;
+    state.currentAgentMessage = message;
+    state.currentAgentPhase = phase || '';
+    state.lastAgentStatusAt = Date.now();
+    dom.statusStrip.className = 'status-strip ' + classMod;
+    const dot = classMod === 'running'
+        ? '<span class="ripple-dot"></span>'
+        : classMod === 'success'
+            ? '<span>✅</span>'
+            : classMod === 'error'
+                ? '<span>❌</span>'
+                : '<span>⏸</span>';
+    dom.statusStrip.innerHTML = `
+        <div class="status-carousel">
+            ${dot}
+            <span class="status-message">${escapeHtml(message)}</span>
+            ${phase ? `<span class="status-phase">${escapeHtml(phase)}</span>` : ''}
+        </div>
+    `;
+}
+function clearAgentStatusQueue() {
+    state.statusQueue = [];
+    if (state.statusQueueTimer) {
+        clearTimeout(state.statusQueueTimer);
+        state.statusQueueTimer = null;
+    }
+}
+function flushAgentStatusQueue() {
+    if (!state.statusQueue.length) {
+        state.statusQueueTimer = null;
+        return;
+    }
+    const elapsed = Date.now() - state.lastAgentStatusAt;
+    const wait = Math.max(0, MIN_AGENT_STATUS_MS - elapsed);
+    if (wait > 0) {
+        state.statusQueueTimer = setTimeout(flushAgentStatusQueue, wait);
+        return;
+    }
+    const next = state.statusQueue.shift();
+    setAgentStatus(next.message, next.phase, next.classMod);
+    if (state.statusQueue.length) {
+        state.statusQueueTimer = setTimeout(flushAgentStatusQueue, MIN_AGENT_STATUS_MS);
+    } else {
+        state.statusQueueTimer = null;
+    }
+}
+function queueAgentStatus(message, phase, classMod = 'running') {
+    const last = state.statusQueue[state.statusQueue.length - 1];
+    if (
+        last
+        && last.message === message
+        && last.phase === phase
+        && last.classMod === classMod
+    ) {
+        return;
+    }
+    state.statusQueue.push({ message, phase, classMod });
+    if (!state.statusQueueTimer) flushAgentStatusQueue();
+}
+function runAfterAgentStatusQueue(callback) {
+    const elapsed = Date.now() - state.lastAgentStatusAt;
+    const currentWait = Math.max(0, MIN_AGENT_STATUS_MS - elapsed);
+    const queuedWait = state.statusQueue.length * MIN_AGENT_STATUS_MS;
+    setTimeout(callback, currentWait + queuedWait);
 }
 function setFooter(text, dotClass) {
     dom.footerText.textContent = text;
@@ -901,6 +1029,14 @@ async function submitReview() {
     state.sentenceSpanIndex = null;
     state.findingCardIndex = null;
     state.issueSidSet = null;
+    state.intent = null;
+    state.plan = null;
+    state.stepStatus = new Map();
+    state.currentAgentMessage = '';
+    state.currentAgentPhase = '';
+    state.agentStatusActive = false;
+    state.lastAgentStatusAt = 0;
+    clearAgentStatusQueue();
     state.doc = null;
     dom.submitBtn.disabled = true;
     dom.submitText.innerHTML = '<span class="spinner"></span> 审核中';
@@ -912,7 +1048,7 @@ async function submitReview() {
     dom.findingsList.innerHTML = '<div class="empty-state"><span class="empty-icon">⏳</span><span class="empty-title">等待 Review 工具输出...</span><span class="empty-hint">Agent 调用合规审核 Skill 后，结构化反馈将在此处生成</span></div>';
     dom.findingsMeta.textContent = '';
     dom.reportContent.innerHTML = '<div class="empty-state"><span class="empty-icon">🧠</span><span class="empty-title">Agent 综合分析中...</span><span class="empty-hint">完成后这里将打字机式呈现完整审核报告</span></div>';
-    setStatus('正在提交审核请求...', 'running');
+    setAgentStatus('正在进行意图识别...', '意图识别');
     setFooter('审核中...', 'running');
     dom.elapsedTime.textContent = '0.0s';
     startTimer();
@@ -966,30 +1102,75 @@ function connectSSE(sessionId) {
     const es = new EventSource(`/api/stream/${sessionId}`);
     state.eventSource = es;
 
+    es.addEventListener('intent_detected', (e) => {
+        try {
+            const p = JSON.parse(e.data);
+            state.intent = p.data.intent || null;
+            queueAgentStatus('正在生成执行计划...', '任务规划');
+        } catch (_) {}
+    });
+    es.addEventListener('plan_created', (e) => {
+        try {
+            const p = JSON.parse(e.data);
+            state.plan = p.data.plan || null;
+            state.stepStatus = new Map();
+            for (const step of ((state.plan && state.plan.steps) || [])) {
+                state.stepStatus.set(step.id, 'pending');
+            }
+        } catch (_) {}
+    });
+    es.addEventListener('plan_step_started', (e) => {
+        try {
+            const p = JSON.parse(e.data);
+            const step = p.data.step || {};
+            if (!state.stepStatus) state.stepStatus = new Map();
+            if (step.id) state.stepStatus.set(step.id, 'running');
+            if (step.id === 'run_review_skill') {
+                queueAgentStatus('调用审核 Skill，执行结构化审核...', '结构化审核');
+            } else if (step.id === 'generate_final_report') {
+                queueAgentStatus('生成完整审核报告...', '报告生成');
+            }
+        } catch (_) {}
+    });
+    es.addEventListener('plan_step_completed', (e) => {
+        try {
+            const p = JSON.parse(e.data);
+            const step = p.data.step || {};
+            const traceEvent = p.data.trace_event || {};
+            if (!state.stepStatus) state.stepStatus = new Map();
+            if (step.id) state.stepStatus.set(step.id, traceEvent.status || 'completed');
+            if (traceEvent.status === 'failed') {
+                clearAgentStatusQueue();
+                setAgentStatus((step.name || '计划步骤') + '失败', step.executor || 'Agent 调度', 'error');
+            }
+        } catch (_) {}
+    });
     es.addEventListener('thought', (e) => {
         try {
             const p = JSON.parse(e.data);
             const text = String(p.data.content || '').slice(0, 100);
-            setStatus('💭 ' + (text || '正在分析评述内容...'), 'running');
+            if (!state.agentStatusActive) setStatus('💭 ' + (text || '正在分析评述内容...'), 'running');
         } catch (_) {}
     });
     es.addEventListener('action', (e) => {
         try { const p = JSON.parse(e.data);
-            setStatus('⚡ 正在调用：' + (p.data.tool || '?'), 'running');
+            if (!state.agentStatusActive) setStatus('⚡ 正在调用：' + (p.data.tool || '?'), 'running');
         } catch (_) {}
     });
     es.addEventListener('skill_start', (e) => {
         try { const p = JSON.parse(e.data);
-            setStatus('⚙️ 正在执行 Skill：' + (p.data.skill || ''), 'running');
+            if (!state.agentStatusActive) {
+                setStatus('⚙️ 正在执行 Skill：' + (p.data.skill || ''), 'running');
+            }
         } catch (_) {}
     });
     es.addEventListener('skill_end', (e) => {
         try { const p = JSON.parse(e.data);
-            setStatus('✓ Skill 完成：' + (p.data.skill || '') + '，继续推理...', 'running');
+            if (!state.agentStatusActive) setStatus('✓ Skill 完成：' + (p.data.skill || '') + '，继续推理...', 'running');
         } catch (_) {}
     });
     es.addEventListener('observation', () => {
-        setStatus('👁 已获取分析结果，正在整合...', 'running');
+        if (!state.agentStatusActive) setStatus('👁 已获取分析结果，正在整合...', 'running');
     });
     es.addEventListener('review_issues', (e) => {
         try {
@@ -1013,10 +1194,11 @@ function connectSSE(sessionId) {
             if (content === '__DONE__') {
                 es.close();
                 state.eventSource = null;
-                handleStreamEnd('success', '审核完成');
+                if (state.isRunning) {
+                    runAfterAgentStatusQueue(() => handleStreamEnd('success', '审核完成'));
+                }
                 return;
             }
-            setStatus('✅ 审核报告已生成', 'success');
             startTypewriter(content);
         } catch (_) { handleStreamEnd('error', '解析最终答案失败'); }
     });
@@ -1042,10 +1224,13 @@ function handleStreamEnd(type, msg) {
     dom.cancelText.innerHTML = '❌ 取消';
 
     if (type === 'success') {
+        clearAgentStatusQueue();
+        setAgentStatus('审核完成', '完成', 'success');
         dom.submitBtn.disabled = false;
         dom.submitText.innerHTML = '📝 重新编辑';
         setFooter(`审核完成，耗时 ${sec} 秒`, null);
     } else if (type === 'cancelled') {
+        clearAgentStatusQueue();
         if (state.typewriterTimer) { clearInterval(state.typewriterTimer); state.typewriterTimer = null; }
         state.finalReport = '';
         dom.copyBtn.style.display = 'none';
@@ -1055,6 +1240,7 @@ function handleStreamEnd(type, msg) {
         dom.submitBtn.disabled = false;
         dom.submitText.innerHTML = '📝 重新编辑';
     } else if (type === 'error') {
+        clearAgentStatusQueue();
         setStatus(msg, 'error');
         setFooter('发生错误', 'error');
         if (!state.finalReport) {

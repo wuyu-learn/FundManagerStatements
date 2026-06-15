@@ -1,7 +1,29 @@
 # AI Demo System
 
+## 架构说明
+
+默认运行链路：
+
+```
+API Server → Agent → skill_runtime → skills/Review.md → LLM
+```
+
+MCP Server 仍然保留，但默认不启动。需要把 Skill 作为标准 MCP tool 暴露给外部客户端时，
+在 `.env` 中设置：
+
+```
+ENABLE_MCP_SERVER=true
+```
+
+开启后可选链路为：
+
+```
+外部 MCP Client → MCP Server → skill_runtime → skills/Review.md → LLM
+```
+
 ## 环境要求
-- Python 3.11 或以上
+- 默认审核链路：Python 3.9 或以上
+- 可选 MCP Server：Python 3.11 或以上
 - 能访问 OpenAI API（或兼容接口）
 
 ## 首次启动
@@ -28,5 +50,5 @@
 填写 YAML Front Matter 元信息和 Prompt 正文，重启服务即可自动注册。
 
 ## 日志查看
-- MCP Server 日志：`logs/mcp_server.log`
+- MCP Server 日志：`logs/mcp_server.log`（仅 `ENABLE_MCP_SERVER=true` 时生成）
 - API Server 日志：`logs/api_server.log`

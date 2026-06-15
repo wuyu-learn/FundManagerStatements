@@ -56,7 +56,11 @@ async def chat(request: ChatRequest):
     emitter = EventEmitter()
 
     async def run_agent():
-        orchestrator = AgentOrchestrator(emitter, doc=doc)
+        orchestrator = AgentOrchestrator(
+            emitter,
+            doc=doc,
+            numbered_text=numbered_text,
+        )
         await orchestrator.run(agent_message)
 
     task = asyncio.create_task(run_agent())

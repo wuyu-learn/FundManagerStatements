@@ -6,6 +6,11 @@ from datetime import datetime
 
 
 class EventType(str, Enum):
+    INTENT_DETECTED = "intent_detected"
+    PLAN_CREATED = "plan_created"
+    PLAN_STEP_STARTED = "plan_step_started"
+    PLAN_STEP_COMPLETED = "plan_step_completed"
+    AGENT_TRACE = "agent_trace"
     THOUGHT = "thought"
     ACTION = "action"
     OBSERVATION = "observation"
