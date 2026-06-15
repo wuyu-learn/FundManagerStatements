@@ -11,10 +11,12 @@ from pydantic import BaseModel
 from agent.orchestrator import AgentOrchestrator
 from agent.event_stream import EventEmitter
 from mcp_server.skill_loader import load_all_skills
+from processor import process_text, format_to_numbered_text
 
 app = FastAPI(title="AI Demo System")
 
-sessions: dict[str, EventEmitter] = {}
+# session_id -> (emitter, agent_task)，保留 task 引用以便 /api/cancel 调 task.cancel()
+sessions: dict[str, tuple[EventEmitter, asyncio.Task]] = {}
 
 FRONTEND_PATH = os.path.join(os.path.dirname(__file__), "..", "frontend", "index.html")
 
@@ -31,23 +33,65 @@ async def index():
 
 @app.post("/api/chat")
 async def chat(request: ChatRequest):
+    raw_text = request.message or ""
+
+    # P2 数据流入：原文 → doc 树 + 编号文本
+    doc = process_text(raw_text)
+    numbered_text = format_to_numbered_text(doc)
+    doc_id = doc["doc_id"]
+
+    # 给 Agent 的指令性消息：明确告知有 [p-s] 编号 + 必须用完整 global_s_id 回引
+    agent_message = (
+        f"请审核以下基金经理评述。\n"
+        f"文档 ID（doc_id）: {doc_id}\n"
+        f"每行已带 [段落编号-句子编号] 标记。调用 Review 工具时，"
+        f"请把下方编号文本完整作为 numbered_text 参数传入，"
+        f"并把 doc_id 作为 doc_id 参数传入。\n"
+        f"返回的每个 issue 的 global_s_id 必须形如 {doc_id}-p-s，"
+        f"严格对应输入里实际命中的 [p-s] 标记。\n\n"
+        f"{numbered_text}"
+    )
+
     session_id = str(uuid.uuid4())
     emitter = EventEmitter()
-    sessions[session_id] = emitter
 
     async def run_agent():
-        orchestrator = AgentOrchestrator(emitter)
-        await orchestrator.run(request.message)
+        orchestrator = AgentOrchestrator(emitter, doc=doc)
+        await orchestrator.run(agent_message)
 
-    asyncio.create_task(run_agent())
-    return JSONResponse({"session_id": session_id})
+    task = asyncio.create_task(run_agent())
+    sessions[session_id] = (emitter, task)
+    return JSONResponse({
+        "session_id": session_id,
+        "doc_id": doc_id,
+        "paragraph_count": len(doc["paragraphs"]),
+        "sentence_count": sum(len(p["sentences"]) for p in doc["paragraphs"]),
+        # P4：前端 col1 直接靠 doc.full_text + paragraphs/sentences 偏移渲染句子级 span
+        "doc": doc,
+    })
+
+
+@app.post("/api/cancel/{session_id}")
+async def cancel(session_id: str):
+    entry = sessions.get(session_id)
+    if not entry:
+        return JSONResponse(
+            {"cancelled": False, "reason": "session not found"},
+            status_code=404,
+        )
+    _, task = entry
+    if task.done():
+        return JSONResponse({"cancelled": False, "reason": "already done"})
+    task.cancel()
+    return JSONResponse({"cancelled": True})
 
 
 @app.get("/api/stream/{session_id}")
 async def stream(session_id: str):
-    emitter = sessions.get(session_id)
-    if not emitter:
+    entry = sessions.get(session_id)
+    if not entry:
         return JSONResponse({"error": "session not found"}, status_code=404)
+    emitter, _ = entry
 
     async def event_generator():
         while True:

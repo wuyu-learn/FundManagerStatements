@@ -21,6 +21,9 @@ logs/
 *.log
 *.pid
 
+# 切分后持久化数据（运行时产物，不入库）
+data/
+
 # IDE
 .idea/
 .vscode/

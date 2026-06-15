@@ -11,6 +11,7 @@ class EventType(str, Enum):
     OBSERVATION = "observation"
     SKILL_START = "skill_start"
     SKILL_END = "skill_end"
+    REVIEW_ISSUES = "review_issues"   # P4：Review 校验后结构化推送给前端 col2
     FINAL_ANSWER = "final_answer"
     ERROR = "error"
 

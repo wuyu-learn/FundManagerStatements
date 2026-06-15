@@ -3,747 +3,1110 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 智能分析系统</title>
+    <title>基金经理文字AI审核</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         :root {
             --bg-primary: #0f172a;
             --bg-card: #1e293b;
+            --bg-card-2: #273449;
+            --border: #334155;
             --accent: #06b6d4;
-        }
+            --accent-dark: #0891b2;
+            --success: #22c55e;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --text-muted: #64748b;
 
+            --sev-low: #06b6d4;
+            --sev-med: #f59e0b;
+            --sev-high: #ef4444;
+        }
+        * { box-sizing: border-box; }
         html, body {
             background-color: var(--bg-primary);
-            color: #e2e8f0;
+            color: var(--text-primary);
             font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
-            margin: 0;
-            padding: 0;
-            height: 100%;
-            overflow: hidden;
+            margin: 0; padding: 0;
+            height: 100%; overflow: hidden;
+            font-size: 14px;
         }
 
-        .app-grid {
+        .app {
             display: grid;
-            grid-template-rows: auto 1fr auto;
+            grid-template-rows: auto auto 1fr auto;
             height: 100vh;
         }
 
-        .main-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            gap: 16px;
-            padding: 16px;
-            overflow: hidden;
-            min-height: 0;
+        /* ============ Top ============ */
+        .top-bar {
+            background: linear-gradient(90deg, #1e293b 0%, #0f172a 100%);
+            padding: 10px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex; align-items: center; justify-content: center;
         }
-
-        .panel {
-            background-color: var(--bg-card);
-            border-radius: 12px;
-            display: flex;
-            flex-direction: column;
-            min-height: 0;
-            overflow: hidden;
-            border: 1px solid rgba(148, 163, 184, 0.1);
-        }
-
-        .panel-header {
-            padding: 12px 16px;
-            border-bottom: 1px solid rgba(148, 163, 184, 0.15);
-            font-weight: 600;
-            color: #06b6d4;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            flex-shrink: 0;
-        }
-
-        .panel-body {
-            flex: 1;
-            overflow-y: auto;
-            padding: 16px;
-            min-height: 0;
-        }
-
-        .panel-body::-webkit-scrollbar { width: 6px; }
-        .panel-body::-webkit-scrollbar-track { background: transparent; }
-        .panel-body::-webkit-scrollbar-thumb {
-            background-color: rgba(148, 163, 184, 0.3);
-            border-radius: 3px;
-        }
-
-        /* Bubble Styles */
-        .bubble {
-            margin-bottom: 12px;
-            padding: 12px 14px;
-            border-radius: 10px;
-            border-left: 3px solid;
-            animation: slideIn 0.3s ease-out;
-            position: relative;
-        }
-        @keyframes slideIn {
-            from { opacity: 0; transform: translateY(8px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        .bubble-thought {
-            background-color: rgba(59, 130, 246, 0.1);
-            border-left-color: #3b82f6;
-        }
-        .bubble-action {
-            background-color: rgba(249, 115, 22, 0.1);
-            border-left-color: #f97316;
-        }
-        .bubble-observation {
-            background-color: rgba(34, 197, 94, 0.1);
-            border-left-color: #22c55e;
-        }
-        .bubble-error {
-            background-color: rgba(239, 68, 68, 0.12);
-            border-left-color: #ef4444;
-        }
-        .bubble-header {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 12px;
-            font-weight: 600;
-            margin-bottom: 6px;
-            opacity: 0.9;
-        }
-        .bubble-content {
-            font-size: 13px;
-            line-height: 1.6;
-            color: #e2e8f0;
-            white-space: pre-wrap;
-            word-break: break-word;
-        }
-        .bubble-meta {
-            font-size: 11px;
-            margin-top: 6px;
-            color: #94a3b8;
-            font-family: ui-monospace, SFMono-Regular, monospace;
-            background: rgba(15, 23, 42, 0.4);
-            padding: 6px 8px;
-            border-radius: 4px;
-            max-height: 120px;
-            overflow-y: auto;
-        }
-
-        /* Typing Cursor */
-        .typing::after {
-            content: '▊';
-            color: var(--accent);
-            animation: blink 1s steps(2, start) infinite;
-            margin-left: 2px;
-        }
-        @keyframes blink {
-            to { visibility: hidden; }
-        }
-
-        /* Skill Cards */
-        .skill-card {
-            background-color: rgba(15, 23, 42, 0.5);
-            border: 2px solid rgba(148, 163, 184, 0.2);
-            border-radius: 10px;
-            padding: 12px 14px;
-            margin-bottom: 10px;
-            transition: all 0.3s ease;
-        }
-        .skill-card.calling {
-            border-color: var(--accent);
-            box-shadow: 0 0 0 0 rgba(6, 182, 212, 0.4);
-            animation: pulse-cyan 1.5s infinite;
-        }
-        @keyframes pulse-cyan {
-            0% { box-shadow: 0 0 0 0 rgba(6, 182, 212, 0.5); }
-            70% { box-shadow: 0 0 0 8px rgba(6, 182, 212, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(6, 182, 212, 0); }
-        }
-        .skill-card.done {
-            border-color: #22c55e;
-        }
-        .skill-card-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 4px;
-        }
-        .skill-card-name {
-            font-size: 13px;
-            font-weight: 600;
-            color: #f1f5f9;
-        }
-        .skill-card-status {
-            font-size: 11px;
-            padding: 2px 8px;
-            border-radius: 10px;
-        }
-        .skill-card.idle .skill-card-status {
-            background: rgba(148, 163, 184, 0.2);
-            color: #94a3b8;
-        }
-        .skill-card.calling .skill-card-status {
-            background: rgba(6, 182, 212, 0.2);
-            color: var(--accent);
-        }
-        .skill-card.done .skill-card-status {
-            background: rgba(34, 197, 94, 0.2);
-            color: #22c55e;
-        }
-        .skill-card-desc {
-            font-size: 11px;
-            color: #94a3b8;
-            line-height: 1.5;
-            margin-bottom: 6px;
-        }
-        .skill-card-preview {
-            font-size: 11px;
-            font-family: ui-monospace, SFMono-Regular, monospace;
-            background: rgba(15, 23, 42, 0.6);
-            padding: 6px 8px;
-            border-radius: 4px;
-            margin-top: 6px;
-            max-height: 80px;
-            overflow-y: auto;
-            color: #cbd5e1;
-            display: none;
-        }
-        .skill-card.done .skill-card-preview {
-            display: block;
-        }
-
-        /* Final Report */
-        .report-placeholder {
-            color: #64748b;
-            text-align: center;
-            padding: 40px 16px;
-            font-size: 13px;
-        }
-        .report-content {
-            font-size: 14px;
-            line-height: 1.8;
-            color: #e2e8f0;
-        }
-        .report-content h1, .report-content h2, .report-content h3 {
-            color: var(--accent);
-            margin-top: 16px;
-            margin-bottom: 10px;
-            font-weight: 700;
-        }
-        .report-content h1 { font-size: 20px; }
-        .report-content h2 { font-size: 17px; }
-        .report-content h3 { font-size: 15px; }
-        .report-content strong { color: #f8fafc; font-weight: 600; }
-        .report-content p { margin-bottom: 10px; }
-        .report-content ul, .report-content ol { padding-left: 22px; margin-bottom: 10px; }
-        .report-content li { margin-bottom: 4px; }
-
-        /* Header bar */
-        .header-bar {
-            background-color: var(--bg-card);
-            padding: 14px 20px;
-            border-bottom: 1px solid rgba(148, 163, 184, 0.1);
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            flex-shrink: 0;
-        }
-        .header-title {
+        .top-bar h1 {
+            margin: 0;
             font-size: 18px;
             font-weight: 700;
-            color: #f1f5f9;
-            white-space: nowrap;
-            display: flex;
-            align-items: center;
-            gap: 8px;
+            letter-spacing: 1px;
+            display: flex; align-items: center; gap: 8px;
         }
-        .header-input {
-            flex: 1;
-            padding: 8px 14px;
-            background-color: rgba(15, 23, 42, 0.6);
-            border: 1px solid rgba(148, 163, 184, 0.2);
-            border-radius: 8px;
-            color: #e2e8f0;
-            font-size: 13px;
-            outline: none;
-            transition: border-color 0.2s;
-        }
-        .header-input:focus {
-            border-color: var(--accent);
-        }
-        .send-btn {
-            padding: 8px 20px;
-            background-color: var(--accent);
-            color: #0f172a;
-            font-weight: 600;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 13px;
-            transition: background-color 0.2s;
-        }
-        .send-btn:hover { background-color: #0891b2; }
-        .send-btn:disabled {
-            background-color: rgba(148, 163, 184, 0.3);
-            color: #94a3b8;
-            cursor: not-allowed;
-        }
-        .copy-btn {
-            padding: 4px 12px;
-            background-color: rgba(6, 182, 212, 0.15);
-            color: var(--accent);
-            border: 1px solid rgba(6, 182, 212, 0.4);
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 12px;
-            transition: background-color 0.2s;
-        }
-        .copy-btn:hover { background-color: rgba(6, 182, 212, 0.25); }
 
-        /* Footer */
-        .footer-bar {
-            background-color: var(--bg-card);
-            padding: 8px 20px;
-            border-top: 1px solid rgba(148, 163, 184, 0.1);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 12px;
-            color: #94a3b8;
-            flex-shrink: 0;
+        /* ============ Status strip ============ */
+        .status-strip {
+            padding: 7px 20px;
+            background: rgba(15,23,42,.55);
+            border-bottom: 1px solid var(--border);
+            font-size: 12.5px;
+            color: var(--text-secondary);
+            min-height: 34px;
+            display: flex; align-items: center; gap: 10px;
+            transition: background .3s, color .3s;
+        }
+        .status-strip.running {
+            color: var(--accent);
+            background: rgba(6,182,212,.08);
+            box-shadow: inset 3px 0 0 var(--accent);
+            animation: pulse-strip 1.8s infinite;
+        }
+        .status-strip.success {
+            color: var(--success);
+            background: rgba(34,197,94,.08);
+            box-shadow: inset 3px 0 0 var(--success);
+        }
+        .status-strip.error {
+            color: var(--danger);
+            background: rgba(239,68,68,.08);
+            box-shadow: inset 3px 0 0 var(--danger);
+        }
+        .status-strip.cancelled {
+            color: var(--warning);
+            background: rgba(245,158,11,.08);
+            box-shadow: inset 3px 0 0 var(--warning);
+        }
+        @keyframes pulse-strip {
+            0%,100% { background: rgba(6,182,212,.08); }
+            50% { background: rgba(6,182,212,.16); }
         }
         .status-dot {
             display: inline-block;
-            width: 8px;
-            height: 8px;
+            width: 8px; height: 8px;
             border-radius: 50%;
-            margin-right: 6px;
-            background-color: #64748b;
+            background-color: currentColor;
+            opacity: .7;
+            animation: pulse-dot 1s infinite;
         }
-        .status-dot.ready { background-color: #22c55e; }
-        .status-dot.running { background-color: var(--accent); animation: pulse-cyan 1.5s infinite; }
-        .status-dot.done { background-color: #22c55e; }
-        .status-dot.error { background-color: #ef4444; }
+        @keyframes pulse-dot {
+            0%,100% { opacity: 1; transform: scale(1); }
+            50% { opacity: .3; transform: scale(.7); }
+        }
+
+        /* ============ Three columns ============ */
+        .columns {
+            display: grid;
+            grid-template-columns: 1.15fr 1fr 1.15fr;
+            gap: 12px;
+            padding: 12px;
+            overflow: hidden;
+            min-height: 0;
+        }
+        .col {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            display: flex; flex-direction: column;
+            min-height: 0;
+            overflow: hidden;
+        }
+        .col-header {
+            padding: 10px 12px 10px 14px;
+            border-bottom: 1px solid var(--border);
+            font-size: 13px;
+            font-weight: 600;
+            color: var(--accent);
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 8px;
+            flex-shrink: 0;
+            background: rgba(15,23,42,.4);
+            min-height: 44px;
+        }
+        .col-header .left-info {
+            display: flex; align-items: center; gap: 8px;
+            min-width: 0; flex: 1;
+        }
+        .col-header .col-meta {
+            font-weight: 400;
+            font-size: 11px;
+            color: var(--text-muted);
+            white-space: nowrap;
+        }
+        .col-header .actions {
+            display: flex; align-items: center; gap: 6px;
+            flex-shrink: 0;
+        }
+        .col-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 14px;
+            min-height: 0;
+        }
+        .col-body.no-padding { padding: 0; }
+        .col-body::-webkit-scrollbar { width: 6px; }
+        .col-body::-webkit-scrollbar-track { background: transparent; }
+        .col-body::-webkit-scrollbar-thumb {
+            background-color: rgba(148,163,184,.3);
+            border-radius: 3px;
+        }
+
+        /* --- Buttons (used in col1 header) --- */
+        .btn {
+            padding: 6px 12px;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all .2s;
+            display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+            letter-spacing: .3px;
+            white-space: nowrap;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, #06b6d4, #0891b2);
+            color: #0f172a;
+        }
+        .btn-primary:hover:not(:disabled) {
+            background: linear-gradient(135deg, #0891b2, #0e7490);
+            box-shadow: 0 4px 12px rgba(6,182,212,.3);
+        }
+        .btn-danger {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+            color: #fff;
+        }
+        .btn-danger:hover:not(:disabled) {
+            background: linear-gradient(135deg, #dc2626, #b91c1c);
+            box-shadow: 0 4px 12px rgba(239,68,68,.35);
+        }
+        .btn-ghost {
+            background: transparent;
+            color: var(--text-secondary);
+            border: 1px solid var(--border);
+        }
+        .btn-ghost:hover:not(:disabled) {
+            color: var(--text-primary);
+            border-color: var(--accent);
+        }
+        .btn:disabled {
+            background: rgba(148,163,184,.18);
+            color: var(--text-muted);
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+        .spinner {
+            width: 10px; height: 10px;
+            border: 2px solid rgba(15,23,42,.3);
+            border-top-color: #0f172a;
+            border-radius: 50%;
+            animation: spin .8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* --- Empty state --- */
+        .empty-state {
+            color: var(--text-muted);
+            opacity: .7;
+            text-align: center;
+            padding: 80px 24px;
+            font-size: 13px;
+            line-height: 1.8;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            height: 100%;
+            justify-content: center;
+        }
+        .empty-icon {
+            font-size: 32px;
+            opacity: .5;
+        }
+        .empty-title {
+            font-size: 13.5px;
+            color: var(--text-secondary);
+            opacity: .9;
+        }
+        .empty-hint {
+            font-size: 11.5px;
+            opacity: .6;
+            max-width: 240px;
+            line-height: 1.7;
+        }
+
+        /* ============ Col 1: Edit mode (textarea) ============ */
+        .input-textarea {
+            width: 100%;
+            height: 100%;
+            min-height: 0;
+            padding: 16px 18px;
+            background: transparent;
+            color: var(--text-primary);
+            border: none;
+            outline: none;
+            resize: none;
+            font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+            font-size: 14px;
+            line-height: 1.85;
+            display: block;
+        }
+        .input-textarea::placeholder {
+            color: var(--text-muted);
+            opacity: .55;
+        }
+
+        /* ============ Col 1: View mode (rendered original text) ============ */
+        #originalText {
+            white-space: pre-wrap;
+            word-break: break-word;
+            line-height: 1.95;
+            font-size: 14px;
+            color: var(--text-primary);
+            font-family: -apple-system, "PingFang SC", "Source Han Serif SC", "Microsoft YaHei", serif;
+            padding: 16px 18px;
+        }
+        .sentence {
+            display: inline;
+            border-radius: 2px;
+            padding: 1px 1px;
+            transition: background-color .2s;
+        }
+        .sentence.has-issue {
+            background-color: rgba(239,68,68,.16);
+            cursor: pointer;
+            border-bottom: 1.5px dashed rgba(239,68,68,.5);
+        }
+        .sentence.has-issue:hover {
+            background-color: rgba(239,68,68,.3);
+        }
+        .sentence.flash {
+            animation: sentence-flash 1.6s ease-in-out;
+        }
+        @keyframes sentence-flash {
+            0%,100% { background-color: rgba(239,68,68,.16); }
+            16%,50%,83% { background-color: rgba(239,68,68,.75); color: #fff; }
+        }
+
+        /* Toggle wrapper inside col1 body */
+        .col1-stage {
+            position: relative;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ============ Col 2: Findings cards ============ */
+        .finding-card {
+            background-color: var(--bg-card-2);
+            border: 1px solid var(--border);
+            border-left: 4px solid var(--text-muted);
+            border-radius: 8px;
+            padding: 11px 13px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all .2s;
+        }
+        .finding-card:hover {
+            border-color: var(--accent);
+            transform: translateX(-2px);
+        }
+        .finding-card.sev-low    { border-left-color: var(--sev-low); }
+        .finding-card.sev-medium { border-left-color: var(--sev-med); }
+        .finding-card.sev-high   { border-left-color: var(--sev-high); }
+
+        .finding-card.active {
+            border: 2px solid var(--accent);
+            box-shadow: 0 0 0 2px rgba(6,182,212,.3), 0 6px 20px rgba(6,182,212,.4);
+            animation: card-flash 1.6s ease-in-out;
+        }
+        @keyframes card-flash {
+            0%,100% { box-shadow: 0 0 0 2px rgba(6,182,212,.3); }
+            33%,66% { box-shadow: 0 0 0 4px rgba(6,182,212,.55), 0 0 25px rgba(6,182,212,.7); }
+        }
+
+        .finding-head {
+            display: flex; align-items: center; gap: 6px;
+            margin-bottom: 6px;
+            font-size: 12px;
+            flex-wrap: wrap;
+        }
+        .sid-tag {
+            font-family: ui-monospace, SFMono-Regular, monospace;
+            background: rgba(6,182,212,.18);
+            color: var(--accent);
+            padding: 1px 6px;
+            border-radius: 4px;
+            font-weight: 600;
+        }
+        .sid-tag.unbound {
+            background: rgba(148,163,184,.2);
+            color: var(--text-muted);
+        }
+        .category-tag {
+            color: var(--text-secondary);
+            font-size: 11.5px;
+        }
+        .severity-tag {
+            margin-left: auto;
+            font-size: 11px;
+            padding: 1px 8px;
+            border-radius: 10px;
+            font-weight: 600;
+        }
+        .severity-tag.sev-low    { background: rgba(6,182,212,.2);   color: var(--sev-low); }
+        .severity-tag.sev-medium { background: rgba(245,158,11,.2);  color: var(--sev-med); }
+        .severity-tag.sev-high   { background: rgba(239,68,68,.2);   color: var(--sev-high); }
+
+        .finding-excerpt {
+            font-size: 12.5px;
+            line-height: 1.55;
+            color: var(--text-primary);
+            background: rgba(15,23,42,.4);
+            padding: 6px 8px;
+            border-radius: 4px;
+            margin-bottom: 6px;
+            font-style: italic;
+        }
+        .finding-comment {
+            font-size: 12.5px;
+            line-height: 1.6;
+            color: var(--text-secondary);
+        }
+        .finding-warning {
+            margin-top: 6px;
+            font-size: 11px;
+            color: var(--warning);
+            background: rgba(245,158,11,.1);
+            padding: 4px 6px;
+            border-radius: 4px;
+        }
+
+        .findings-summary {
+            background: rgba(6,182,212,.08);
+            border: 1px solid rgba(6,182,212,.25);
+            border-radius: 8px;
+            padding: 8px 11px;
+            margin-bottom: 12px;
+            font-size: 12.5px;
+            line-height: 1.55;
+            color: var(--text-primary);
+        }
+        .findings-summary .label {
+            color: var(--accent);
+            font-weight: 700;
+            font-size: 11px;
+            margin-right: 4px;
+        }
+
+        /* ============ Col 3: Report ============ */
+        .copy-btn {
+            padding: 3px 10px;
+            background-color: rgba(6,182,212,.15);
+            color: var(--accent);
+            border: 1px solid rgba(6,182,212,.4);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 11.5px;
+            font-weight: 500;
+            transition: background-color .2s;
+        }
+        .copy-btn:hover { background-color: rgba(6,182,212,.25); }
+
+        .markdown {
+            font-size: 13.5px;
+            line-height: 1.85;
+            color: var(--text-primary);
+            word-break: break-word;
+        }
+        .markdown h1, .markdown h2, .markdown h3 {
+            color: var(--accent);
+            margin-top: 16px;
+            margin-bottom: 8px;
+            font-weight: 700;
+        }
+        .markdown h1 { font-size: 18px; border-bottom: 1px solid var(--border); padding-bottom: 3px; }
+        .markdown h2 { font-size: 15px; border-bottom: 1px solid rgba(51,65,85,.5); padding-bottom: 2px; }
+        .markdown h3 { font-size: 14px; }
+        .markdown strong { color: #f8fafc; font-weight: 700; }
+        .markdown p { margin-bottom: 8px; }
+        .markdown ul, .markdown ol { padding-left: 22px; margin-bottom: 8px; }
+        .markdown li { margin-bottom: 4px; }
+
+        .typing-cursor::after {
+            content: '▊';
+            color: var(--accent);
+            animation: blink 1s steps(2,start) infinite;
+            margin-left: 2px;
+        }
+        @keyframes blink { to { visibility: hidden; } }
+
+        /* ============ Footer ============ */
+        .bottom-bar {
+            background-color: var(--bg-card);
+            padding: 7px 20px;
+            border-top: 1px solid var(--border);
+            display: flex; justify-content: space-between; align-items: center;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+        .footer-dot {
+            display: inline-block;
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background-color: var(--success);
+            margin-right: 6px;
+        }
+        .footer-dot.running { background-color: var(--accent); animation: pulse-dot 1s infinite; }
+        .footer-dot.error { background-color: var(--danger); }
+        .footer-dot.cancelled { background-color: var(--warning); }
     </style>
 </head>
 <body>
-    <div class="app-grid">
-        <!-- Header Bar -->
-        <div class="header-bar">
-            <div class="header-title">
-                <span>🤖</span><span>AI 智能分析系统</span>
-            </div>
-            <input id="userInput" class="header-input" type="text"
-                   placeholder="请输入您要分析的问题，例如：分析最近的市场趋势..."
-                   autocomplete="off">
-            <button id="sendBtn" class="send-btn">发送 ▶</button>
-        </div>
+<div class="app">
+    <!-- 1. Top bar -->
+    <header class="top-bar">
+        <h1><span>⚖️</span><span>基金经理文字AI审核</span></h1>
+    </header>
 
-        <!-- Main Three Columns -->
-        <div class="main-grid">
-            <!-- Left: Agent Thinking -->
-            <div class="panel">
-                <div class="panel-header">
-                    <span>🧠</span><span>Agent 思考流</span>
-                </div>
-                <div id="thinkingPanel" class="panel-body">
-                    <div class="report-placeholder">
-                        等待用户输入...<br>Agent 推理过程将实时显示在这里
-                    </div>
-                </div>
-            </div>
-
-            <!-- Middle: Skill Status -->
-            <div class="panel">
-                <div class="panel-header">
-                    <span>🔧</span><span>Skill 状态面板</span>
-                </div>
-                <div id="skillPanel" class="panel-body">
-                    <div class="report-placeholder">正在加载已注册 Skill ...</div>
-                </div>
-            </div>
-
-            <!-- Right: Final Report -->
-            <div class="panel">
-                <div class="panel-header" style="justify-content: space-between;">
-                    <span style="display: flex; align-items: center; gap: 8px;"><span>📊</span><span>最终分析报告</span></span>
-                    <button id="copyBtn" class="copy-btn" style="display: none;">📋 复制报告</button>
-                </div>
-                <div id="reportPanel" class="panel-body">
-                    <div class="report-placeholder">
-                        待 Agent 完成全部分析后<br>最终报告将展示在这里
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- Footer Status Bar -->
-        <div class="footer-bar">
-            <div>
-                <span id="statusDot" class="status-dot ready"></span>
-                <span id="statusText">就绪</span>
-            </div>
-            <div>
-                耗时：<span id="elapsedTime">0.0s</span> ·
-                迭代次数：<span id="iterationCount">0</span>
-            </div>
-        </div>
+    <!-- 2. Status strip -->
+    <div id="statusStrip" class="status-strip">
+        <span style="opacity:.6">等待审核任务...</span>
     </div>
 
-    <script>
-        // ========== 状态变量 ==========
-        const state = {
-            sessionId: null,
-            eventSource: null,
-            startTime: null,
-            timerInterval: null,
-            iteration: 0,
-            skillElements: {},   // skill_name => DOM element
-            finalReport: '',
-        };
+    <!-- 3. Three columns -->
+    <main class="columns">
+        <!-- Col 1: Original (edit + view dual mode) -->
+        <div class="col">
+            <div class="col-header">
+                <div class="left-info">
+                    <span>📋 原始文本</span>
+                    <span class="col-meta" id="col1Meta"></span>
+                </div>
+                <div class="actions">
+                    <button id="submitBtn" class="btn btn-primary">
+                        <span id="submitText">🔍 开始审核</span>
+                    </button>
+                    <button id="cancelBtn" class="btn btn-danger" disabled>
+                        <span id="cancelText">❌ 取消</span>
+                    </button>
+                </div>
+            </div>
+            <div class="col-body no-padding">
+                <div class="col1-stage">
+                    <!-- 编辑态：满高度 textarea -->
+                    <textarea id="inputArea" class="input-textarea"
+                              placeholder="请在此处粘贴基金经理评述内容..."></textarea>
+                    <!-- 查看态：句子级 span 渲染（默认隐藏） -->
+                    <div id="originalText" style="display:none"></div>
+                </div>
+            </div>
+        </div>
 
-        // ========== DOM 引用 ==========
-        const dom = {
-            input: document.getElementById('userInput'),
-            sendBtn: document.getElementById('sendBtn'),
-            thinkingPanel: document.getElementById('thinkingPanel'),
-            skillPanel: document.getElementById('skillPanel'),
-            reportPanel: document.getElementById('reportPanel'),
-            copyBtn: document.getElementById('copyBtn'),
-            statusDot: document.getElementById('statusDot'),
-            statusText: document.getElementById('statusText'),
-            elapsedTime: document.getElementById('elapsedTime'),
-            iterationCount: document.getElementById('iterationCount'),
-        };
+        <!-- Col 2: Findings cards -->
+        <div class="col">
+            <div class="col-header">
+                <div class="left-info">
+                    <span>🔧 审核反馈</span>
+                    <span class="col-meta" id="findingsMeta"></span>
+                </div>
+            </div>
+            <div class="col-body" id="findingsBody">
+                <div id="findingsList">
+                    <div class="empty-state">
+                        <span class="empty-icon">🪧</span>
+                        <span class="empty-title">等待审核完成...</span>
+                        <span class="empty-hint">完成后的单点合规缺陷与文字错误将在此处生成定位卡片，点击可跳转到左侧对应原文</span>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-        // ========== 工具函数 ==========
-        function escapeHtml(str) {
-            return String(str)
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;')
-                .replace(/'/g, '&#39;');
+        <!-- Col 3: Summary report -->
+        <div class="col">
+            <div class="col-header">
+                <div class="left-info">
+                    <span>📊 完整审核报告</span>
+                </div>
+                <div class="actions">
+                    <button id="copyBtn" class="copy-btn" style="display:none">📋 复制</button>
+                </div>
+            </div>
+            <div class="col-body">
+                <div id="reportContent">
+                    <div class="empty-state">
+                        <span class="empty-icon">📊</span>
+                        <span class="empty-title">等待综合分析...</span>
+                        <span class="empty-hint">Agent 收拢全部 Skill 输出后，最终报告将在此处以打字机方式呈现</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 4. Footer -->
+    <footer class="bottom-bar">
+        <div>
+            <span id="footerDot" class="footer-dot"></span>
+            <span id="footerText">就绪</span>
+        </div>
+        <div>耗时: <span id="elapsedTime" style="color:var(--text-primary)">0.0s</span></div>
+    </footer>
+</div>
+
+<script>
+// ============================================================
+// State
+// ============================================================
+const state = {
+    mode: 'edit',              // 'edit' | 'view'
+    sessionId: null,
+    docId: null,
+    doc: null,
+    sentenceSpanIndex: null,
+    findingCardIndex: null,
+    issueSidSet: null,
+
+    eventSource: null,
+    startTime: null,
+    timerInterval: null,
+    typewriterTimer: null,
+    finalReport: '',
+    isRunning: false,
+    cancelling: false,
+};
+
+// ============================================================
+// DOM
+// ============================================================
+const dom = {
+    inputArea: document.getElementById('inputArea'),
+    submitBtn: document.getElementById('submitBtn'),
+    submitText: document.getElementById('submitText'),
+    cancelBtn: document.getElementById('cancelBtn'),
+    cancelText: document.getElementById('cancelText'),
+    statusStrip: document.getElementById('statusStrip'),
+    originalText: document.getElementById('originalText'),
+    col1Meta: document.getElementById('col1Meta'),
+    findingsList: document.getElementById('findingsList'),
+    findingsBody: document.getElementById('findingsBody'),
+    findingsMeta: document.getElementById('findingsMeta'),
+    reportContent: document.getElementById('reportContent'),
+    copyBtn: document.getElementById('copyBtn'),
+    footerDot: document.getElementById('footerDot'),
+    footerText: document.getElementById('footerText'),
+    elapsedTime: document.getElementById('elapsedTime'),
+};
+
+// ============================================================
+// Helpers
+// ============================================================
+function escapeHtml(s) {
+    return String(s)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+function setStatus(text, classMod) {
+    dom.statusStrip.className = 'status-strip' + (classMod ? ' ' + classMod : '');
+    let icon = '';
+    if (classMod === 'running')        icon = '<span class="status-dot"></span>';
+    else if (classMod === 'success')   icon = '<span>✅</span>';
+    else if (classMod === 'error')     icon = '<span>❌</span>';
+    else if (classMod === 'cancelled') icon = '<span>⏸</span>';
+    dom.statusStrip.innerHTML = `${icon}<span style="${!classMod?'opacity:.6':''}">${escapeHtml(text)}</span>`;
+}
+function setFooter(text, dotClass) {
+    dom.footerText.textContent = text;
+    dom.footerDot.className = 'footer-dot' + (dotClass ? ' ' + dotClass : '');
+}
+function extractShortSid(globalSid) {
+    if (!globalSid) return '?-?';
+    const parts = globalSid.split('-');
+    return parts.length >= 3 ? parts.slice(-2).join('-') : globalSid;
+}
+
+// ============================================================
+// Mode switching (Col 1: edit ↔ view)
+// ============================================================
+function setMode(mode) {
+    state.mode = mode;
+    if (mode === 'edit') {
+        dom.inputArea.style.display = 'block';
+        dom.originalText.style.display = 'none';
+        dom.col1Meta.textContent = '';
+        if (!state.isRunning) {
+            dom.submitText.innerHTML = '🔍 开始审核';
         }
+        setTimeout(() => dom.inputArea.focus(), 0);
+    } else { // view
+        dom.inputArea.style.display = 'none';
+        dom.originalText.style.display = 'block';
+    }
+}
 
-        function setStatus(state_, text) {
-            dom.statusDot.className = 'status-dot ' + state_;
-            dom.statusText.textContent = text;
+// ============================================================
+// Markdown (minimal)
+// ============================================================
+function renderMarkdown(md) {
+    let html = escapeHtml(md);
+    html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+    html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+    html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+    html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    html = html.replace(/(?:^|\n)(\s*)[-*] (.+)/g, (_, ind, item) => `\n${ind}<li>${item}</li>`);
+    html = html.replace(/(<li>[\s\S]*?<\/li>(\n<li>[\s\S]*?<\/li>)*)/g, '<ul>$1</ul>');
+    const blocks = html.split(/\n{2,}/);
+    return blocks.map(b => {
+        const t = b.trim();
+        if (!t) return '';
+        if (t.startsWith('<h') || t.startsWith('<ul') || t.startsWith('<ol') || t.startsWith('<li')) return t;
+        return '<p>' + t.replace(/\n/g, '<br>') + '</p>';
+    }).join('\n');
+}
+
+// ============================================================
+// Col 1: render original text with sentence spans
+// ============================================================
+function renderOriginalText(doc) {
+    state.doc = doc;
+    const container = dom.originalText;
+    container.innerHTML = '';
+
+    if (!doc || !doc.full_text) {
+        container.innerHTML = '<div class="empty-state"><span class="empty-icon">📭</span><span class="empty-title">文档为空</span></div>';
+        return;
+    }
+
+    const sentences = [];
+    for (const p of (doc.paragraphs || [])) {
+        for (const s of (p.sentences || [])) sentences.push(s);
+    }
+    sentences.sort((a, b) => a.char_start - b.char_start);
+    state.sentenceSpanIndex = new Map();
+
+    const fullText = doc.full_text;
+    const fragment = document.createDocumentFragment();
+    let cursor = 0;
+    for (const s of sentences) {
+        if (s.char_start > cursor) {
+            fragment.appendChild(document.createTextNode(fullText.slice(cursor, s.char_start)));
         }
+        const span = document.createElement('span');
+        span.className = 'sentence';
+        span.dataset.sid = s.global_s_id;
+        span.textContent = fullText.slice(s.char_start, s.char_end);
+        fragment.appendChild(span);
+        state.sentenceSpanIndex.set(s.global_s_id, span);
+        cursor = s.char_end;
+    }
+    if (cursor < fullText.length) {
+        fragment.appendChild(document.createTextNode(fullText.slice(cursor)));
+    }
+    container.appendChild(fragment);
 
-        function clearPanel(panel) {
-            panel.innerHTML = '';
+    const pCount = (doc.paragraphs || []).length;
+    dom.col1Meta.textContent = `${pCount} 段 / ${sentences.length} 句`;
+}
+
+// ============================================================
+// Col 2: render findings cards (also highlights col 1)
+// ============================================================
+function renderFindings(issues, summary) {
+    const list = dom.findingsList;
+    list.innerHTML = '';
+    state.findingCardIndex = new Map();
+    state.issueSidSet = new Set();
+
+    if (summary) {
+        const sumDiv = document.createElement('div');
+        sumDiv.className = 'findings-summary';
+        sumDiv.innerHTML = `<span class="label">综述</span>${escapeHtml(summary)}`;
+        list.appendChild(sumDiv);
+    }
+
+    if (!issues || issues.length === 0) {
+        const empty = document.createElement('div');
+        empty.className = 'empty-state';
+        empty.innerHTML = `
+            <span class="empty-icon" style="color:var(--success)">✅</span>
+            <span class="empty-title" style="color:var(--success)">未发现违规问题</span>
+            <span class="empty-hint">文本未触发任何合规与文字检测规则，措辞规范</span>
+        `;
+        list.appendChild(empty);
+        dom.findingsMeta.textContent = '0 项问题';
+        document.querySelectorAll('#originalText .sentence.has-issue')
+            .forEach(el => el.classList.remove('has-issue'));
+        return;
+    }
+
+    issues.forEach(iss => { if (iss.global_s_id) state.issueSidSet.add(iss.global_s_id); });
+    document.querySelectorAll('#originalText .sentence').forEach(span => {
+        if (state.issueSidSet.has(span.dataset.sid)) span.classList.add('has-issue');
+        else span.classList.remove('has-issue');
+    });
+
+    issues.forEach((iss, idx) => {
+        const sev = (iss.severity || 'medium').toLowerCase();
+        const card = document.createElement('div');
+        card.className = `finding-card sev-${sev}`;
+        const sid = iss.global_s_id || null;
+        if (sid) {
+            card.dataset.targetSid = sid;
+            state.findingCardIndex.set(sid, card);
         }
+        card.dataset.idx = String(idx);
 
-        function scrollToBottom(panel) {
-            panel.scrollTop = panel.scrollHeight;
+        const sidLabel = sid ? extractShortSid(sid) : '⚠ 未定位';
+        const sidClass = sid ? '' : 'unbound';
+        const sevLabel = { high: '高风险', medium: '中风险', low: '低风险' }[sev] || sev;
+
+        card.innerHTML = `
+            <div class="finding-head">
+                <span class="sid-tag ${sidClass}">[${escapeHtml(sidLabel)}]</span>
+                <span class="category-tag">${escapeHtml(iss.category || '未分类')}</span>
+                <span class="severity-tag sev-${sev}">${sevLabel}</span>
+            </div>
+            <div class="finding-excerpt">${escapeHtml(iss.excerpt || '')}</div>
+            <div class="finding-comment">${escapeHtml(iss.comment || iss.suggestion || '')}</div>
+            ${iss._validation_warning ? `<div class="finding-warning">⚠️ ${escapeHtml(iss._validation_warning)}</div>` : ''}
+        `;
+        list.appendChild(card);
+    });
+
+    const total = issues.length;
+    const highCount = issues.filter(i => (i.severity || '').toLowerCase() === 'high').length;
+    dom.findingsMeta.textContent = `${total} 项问题${highCount ? `（高风险 ${highCount}）` : ''}`;
+}
+
+// ============================================================
+// Bi-directional click handlers
+// ============================================================
+function flashSentence(span) {
+    span.classList.remove('flash');
+    void span.offsetWidth;
+    span.classList.add('flash');
+    setTimeout(() => span.classList.remove('flash'), 1700);
+}
+function flashCard(card) {
+    card.classList.remove('active');
+    void card.offsetWidth;
+    card.classList.add('active');
+    setTimeout(() => card.classList.remove('active'), 1700);
+}
+
+dom.findingsList.addEventListener('click', (e) => {
+    const card = e.target.closest('.finding-card');
+    if (!card) return;
+    const sid = card.dataset.targetSid;
+    if (!sid || !state.sentenceSpanIndex) return;
+    const span = state.sentenceSpanIndex.get(sid);
+    if (!span) return;
+    span.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    flashSentence(span);
+});
+
+dom.originalText.addEventListener('click', (e) => {
+    const span = e.target.closest('.sentence.has-issue');
+    if (!span) return;
+    const sid = span.dataset.sid;
+    if (!sid || !state.findingCardIndex) return;
+    const card = state.findingCardIndex.get(sid);
+    if (!card) return;
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    flashCard(card);
+});
+
+// ============================================================
+// Col 3: typewriter
+// ============================================================
+function startTypewriter(fullText) {
+    if (state.typewriterTimer) clearInterval(state.typewriterTimer);
+    state.finalReport = fullText;
+    dom.copyBtn.style.display = 'inline-block';
+
+    const wrap = dom.reportContent;
+    wrap.innerHTML = '<div id="typewriterTarget" class="markdown typing-cursor"></div>';
+    const target = document.getElementById('typewriterTarget');
+
+    let i = 0;
+    state.typewriterTimer = setInterval(() => {
+        if (i >= fullText.length) {
+            clearInterval(state.typewriterTimer);
+            state.typewriterTimer = null;
+            target.classList.remove('typing-cursor');
+            target.innerHTML = renderMarkdown(fullText);
+            return;
         }
+        i++;
+        target.innerHTML = renderMarkdown(fullText.slice(0, i));
+        target.classList.add('typing-cursor');
+        wrap.scrollTop = wrap.scrollHeight;
+    }, 20);
+}
 
-        // ========== 简易 Markdown 渲染 ==========
-        function renderMarkdown(md) {
-            let html = escapeHtml(md);
-            // headers
-            html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
-            html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
-            html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
-            // bold
-            html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-            // unordered list
-            html = html.replace(/(?:^|\n)(\s*)[-*] (.+)/g, (_, indent, item) => `\n${indent}<li>${item}</li>`);
-            html = html.replace(/(<li>[\s\S]*?<\/li>(\n<li>[\s\S]*?<\/li>)*)/g, '<ul>$1</ul>');
-            // paragraphs
-            const lines = html.split(/\n{2,}/);
-            html = lines.map(line => {
-                const t = line.trim();
-                if (!t) return '';
-                if (t.startsWith('<h') || t.startsWith('<ul') || t.startsWith('<li')) return t;
-                return '<p>' + t.replace(/\n/g, '<br>') + '</p>';
-            }).join('\n');
-            return html;
+// ============================================================
+// Timer
+// ============================================================
+function startTimer() {
+    state.startTime = Date.now();
+    state.timerInterval = setInterval(() => {
+        const sec = ((Date.now() - state.startTime) / 1000).toFixed(1);
+        dom.elapsedTime.textContent = sec + 's';
+    }, 100);
+}
+function stopTimer() {
+    if (state.timerInterval) { clearInterval(state.timerInterval); state.timerInterval = null; }
+}
+function elapsedSeconds() {
+    if (!state.startTime) return '0.0';
+    return ((Date.now() - state.startTime) / 1000).toFixed(1);
+}
+
+// ============================================================
+// Submit
+// ============================================================
+async function submitReview() {
+    if (state.isRunning) return;
+
+    // 如果当前是 view 模式（已完成的审核），点 submit 表示「重新编辑」→ 切回 edit
+    if (state.mode === 'view') {
+        setMode('edit');
+        return;
+    }
+
+    const raw = dom.inputArea.value.trim();
+    if (!raw) {
+        setStatus('请先粘贴评述内容', 'error');
+        setTimeout(() => { if (!state.isRunning) setStatus('等待审核任务...', null); }, 2000);
+        dom.inputArea.focus();
+        return;
+    }
+
+    // Reset
+    if (state.eventSource) { state.eventSource.close(); state.eventSource = null; }
+    if (state.typewriterTimer) { clearInterval(state.typewriterTimer); state.typewriterTimer = null; }
+    state.finalReport = '';
+    state.isRunning = true;
+    state.cancelling = false;
+    state.sentenceSpanIndex = null;
+    state.findingCardIndex = null;
+    state.issueSidSet = null;
+    state.doc = null;
+    dom.submitBtn.disabled = true;
+    dom.submitText.innerHTML = '<span class="spinner"></span> 审核中';
+    dom.cancelBtn.disabled = false;
+    dom.cancelText.innerHTML = '❌ 取消';
+    dom.copyBtn.style.display = 'none';
+    dom.originalText.innerHTML = '<div class="empty-state"><span class="empty-icon">⏳</span><span class="empty-title">正在切分原文...</span></div>';
+    dom.col1Meta.textContent = '';
+    dom.findingsList.innerHTML = '<div class="empty-state"><span class="empty-icon">⏳</span><span class="empty-title">等待 Review 工具输出...</span><span class="empty-hint">Agent 调用合规审核 Skill 后，结构化反馈将在此处生成</span></div>';
+    dom.findingsMeta.textContent = '';
+    dom.reportContent.innerHTML = '<div class="empty-state"><span class="empty-icon">🧠</span><span class="empty-title">Agent 综合分析中...</span><span class="empty-hint">完成后这里将打字机式呈现完整审核报告</span></div>';
+    setStatus('正在提交审核请求...', 'running');
+    setFooter('审核中...', 'running');
+    dom.elapsedTime.textContent = '0.0s';
+    startTimer();
+
+    try {
+        const resp = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: raw }),
+        });
+        const data = await resp.json();
+        if (!data.session_id) throw new Error(data.error || '未返回 session_id');
+        state.sessionId = data.session_id;
+        state.docId = data.doc_id || null;
+
+        // 立刻切到 view 模式并渲染原文
+        if (data.doc) {
+            renderOriginalText(data.doc);
+            setMode('view');
         }
+        connectSSE(data.session_id);
+    } catch (e) {
+        handleStreamEnd('error', '请求失败: ' + (e.message || e));
+    }
+}
 
-        // ========== 打字机效果 ==========
-        function typeText(element, text, speed = 18) {
-            element.classList.add('typing');
-            element.textContent = '';
-            let i = 0;
-            return new Promise(resolve => {
-                const tick = () => {
-                    if (i < text.length) {
-                        element.textContent += text[i++];
-                        setTimeout(tick, speed);
-                    } else {
-                        element.classList.remove('typing');
-                        resolve();
-                    }
-                };
-                tick();
-            });
+// ============================================================
+// Cancel
+// ============================================================
+async function cancelReview() {
+    if (!state.isRunning || state.cancelling) return;
+    if (!state.sessionId) return;
+    state.cancelling = true;
+    dom.cancelBtn.disabled = true;
+    dom.cancelText.innerHTML = '⏳ 正在取消...';
+
+    if (state.typewriterTimer) { clearInterval(state.typewriterTimer); state.typewriterTimer = null; }
+    state.finalReport = '';
+    dom.copyBtn.style.display = 'none';
+    dom.reportContent.innerHTML = '<div class="empty-state"><span class="empty-icon">⏸</span><span class="empty-title" style="color:var(--warning)">正在取消审核...</span></div>';
+
+    try {
+        await fetch('/api/cancel/' + encodeURIComponent(state.sessionId), { method: 'POST' });
+    } catch (_) {}
+}
+
+// ============================================================
+// SSE
+// ============================================================
+function connectSSE(sessionId) {
+    const es = new EventSource(`/api/stream/${sessionId}`);
+    state.eventSource = es;
+
+    es.addEventListener('thought', (e) => {
+        try {
+            const p = JSON.parse(e.data);
+            const text = String(p.data.content || '').slice(0, 100);
+            setStatus('💭 ' + (text || '正在分析评述内容...'), 'running');
+        } catch (_) {}
+    });
+    es.addEventListener('action', (e) => {
+        try { const p = JSON.parse(e.data);
+            setStatus('⚡ 正在调用：' + (p.data.tool || '?'), 'running');
+        } catch (_) {}
+    });
+    es.addEventListener('skill_start', (e) => {
+        try { const p = JSON.parse(e.data);
+            setStatus('⚙️ 正在执行 Skill：' + (p.data.skill || ''), 'running');
+        } catch (_) {}
+    });
+    es.addEventListener('skill_end', (e) => {
+        try { const p = JSON.parse(e.data);
+            setStatus('✓ Skill 完成：' + (p.data.skill || '') + '，继续推理...', 'running');
+        } catch (_) {}
+    });
+    es.addEventListener('observation', () => {
+        setStatus('👁 已获取分析结果，正在整合...', 'running');
+    });
+    es.addEventListener('review_issues', (e) => {
+        try {
+            const p = JSON.parse(e.data);
+            // 调试用：浏览器 devtools console 可看到 Review 实际推过来的内容
+            console.log('[SSE review_issues]', p.data);
+            renderFindings(p.data.issues || [], p.data.summary || '');
+        } catch (err) {
+            console.error('[SSE review_issues] parse failed', err);
         }
-
-        // ========== 加载 Skill 列表 ==========
-        async function loadSkills() {
-            try {
-                const resp = await fetch('/api/skills');
-                const skills = await resp.json();
-                clearPanel(dom.skillPanel);
-                if (!skills.length) {
-                    dom.skillPanel.innerHTML = '<div class="report-placeholder">暂无已注册 Skill</div>';
-                    return;
-                }
-                skills.forEach(skill => {
-                    const card = document.createElement('div');
-                    card.className = 'skill-card idle';
-                    card.dataset.skill = skill.name;
-                    card.innerHTML = `
-                        <div class="skill-card-header">
-                            <div class="skill-card-name">${escapeHtml(skill.name)}</div>
-                            <div class="skill-card-status">待机</div>
-                        </div>
-                        <div class="skill-card-desc">${escapeHtml(skill.description || '')}</div>
-                        <div class="skill-card-preview"></div>
-                    `;
-                    dom.skillPanel.appendChild(card);
-                    state.skillElements[skill.name] = card;
-                });
-            } catch (e) {
-                dom.skillPanel.innerHTML = `<div class="report-placeholder" style="color: #ef4444;">加载 Skill 失败：${escapeHtml(e.message)}</div>`;
-            }
-        }
-
-        // ========== 添加 Bubble ==========
-        function addBubble(type, headerText, contentText, meta) {
-            // 移除占位符
-            const placeholder = dom.thinkingPanel.querySelector('.report-placeholder');
-            if (placeholder) placeholder.remove();
-
-            const icons = {
-                thought: '💭',
-                action: '⚡',
-                observation: '👁',
-                error: '❌',
-            };
-            const bubble = document.createElement('div');
-            bubble.className = `bubble bubble-${type}`;
-            const headerHtml = `<div class="bubble-header"><span>${icons[type] || '•'}</span><span>${escapeHtml(headerText)}</span></div>`;
-            const contentSpan = document.createElement('div');
-            contentSpan.className = 'bubble-content';
-            const metaHtml = meta ? `<div class="bubble-meta">${escapeHtml(meta)}</div>` : '';
-            bubble.innerHTML = headerHtml;
-            bubble.appendChild(contentSpan);
-            if (meta) {
-                const metaDiv = document.createElement('div');
-                metaDiv.className = 'bubble-meta';
-                metaDiv.textContent = meta;
-                bubble.appendChild(metaDiv);
-            }
-            dom.thinkingPanel.appendChild(bubble);
-            scrollToBottom(dom.thinkingPanel);
-
-            if (type === 'thought') {
-                typeText(contentSpan, contentText).then(() => scrollToBottom(dom.thinkingPanel));
-            } else {
-                contentSpan.textContent = contentText;
-            }
-            return bubble;
-        }
-
-        // ========== Skill 卡片状态切换 ==========
-        function setSkillCalling(skillName) {
-            const card = state.skillElements[skillName];
-            if (!card) return;
-            card.classList.remove('idle', 'done');
-            card.classList.add('calling');
-            card.querySelector('.skill-card-status').textContent = '调用中...';
-            card.querySelector('.skill-card-preview').textContent = '';
-        }
-
-        function setSkillDone(skillName, preview) {
-            const card = state.skillElements[skillName];
-            if (!card) return;
-            card.classList.remove('idle', 'calling');
-            card.classList.add('done');
-            card.querySelector('.skill-card-status').textContent = '✓ 完成';
-            const previewEl = card.querySelector('.skill-card-preview');
-            previewEl.textContent = preview || '';
-        }
-
-        function resetAllSkillCards() {
-            for (const name in state.skillElements) {
-                const card = state.skillElements[name];
-                card.classList.remove('calling', 'done');
-                card.classList.add('idle');
-                card.querySelector('.skill-card-status').textContent = '待机';
-                card.querySelector('.skill-card-preview').textContent = '';
-            }
-        }
-
-        // ========== 计时器 ==========
-        function startTimer() {
-            state.startTime = Date.now();
-            state.timerInterval = setInterval(() => {
-                const elapsed = ((Date.now() - state.startTime) / 1000).toFixed(1);
-                dom.elapsedTime.textContent = elapsed + 's';
-            }, 100);
-        }
-
-        function stopTimer() {
-            if (state.timerInterval) {
-                clearInterval(state.timerInterval);
-                state.timerInterval = null;
-            }
-        }
-
-        // ========== 发送 ==========
-        async function sendMessage() {
-            const message = dom.input.value.trim();
-            if (!message) return;
-            if (state.eventSource) {
-                state.eventSource.close();
+    });
+    es.addEventListener('error', (e) => {
+        try { const p = JSON.parse(e.data);
+            handleStreamEnd('error', p.data.message || '审核过程出错');
+        } catch (_) { handleStreamEnd('error', '连接异常'); }
+    });
+    es.addEventListener('final_answer', (e) => {
+        try {
+            const p = JSON.parse(e.data);
+            const content = p.data.content || '';
+            if (content === '__DONE__') {
+                es.close();
                 state.eventSource = null;
+                handleStreamEnd('success', '审核完成');
+                return;
             }
-
-            // 重置 UI
-            clearPanel(dom.thinkingPanel);
-            clearPanel(dom.reportPanel);
-            dom.reportPanel.innerHTML = '<div class="report-placeholder">分析进行中，请稍候...</div>';
-            dom.copyBtn.style.display = 'none';
-            resetAllSkillCards();
-            state.finalReport = '';
-            state.iteration = 0;
-            dom.iterationCount.textContent = '0';
-            dom.sendBtn.disabled = true;
-            setStatus('running', '分析中...');
-            startTimer();
-
-            try {
-                const resp = await fetch('/api/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message }),
-                });
-                const data = await resp.json();
-                if (!data.session_id) {
-                    throw new Error('未返回 session_id');
-                }
-                state.sessionId = data.session_id;
-                connectSSE(data.session_id);
-            } catch (e) {
-                addBubble('error', '请求失败', e.message);
-                handleStreamEnd('error', '请求失败');
-            }
+            setStatus('✅ 审核报告已生成', 'success');
+            startTypewriter(content);
+        } catch (_) { handleStreamEnd('error', '解析最终答案失败'); }
+    });
+    es.onerror = () => {
+        if (state.eventSource) {
+            state.eventSource.close();
+            state.eventSource = null;
+            if (state.isRunning) handleStreamEnd('error', '与服务器连接中断');
         }
+    };
+}
 
-        // ========== SSE 连接 ==========
-        function connectSSE(sessionId) {
-            const es = new EventSource(`/api/stream/${sessionId}`);
-            state.eventSource = es;
+function handleStreamEnd(type, msg) {
+    stopTimer();
+    const sec = elapsedSeconds();
+    if (state.cancelling) {
+        type = 'cancelled';
+        msg = msg || '已取消';
+    }
+    state.isRunning = false;
+    state.cancelling = false;
+    dom.cancelBtn.disabled = true;
+    dom.cancelText.innerHTML = '❌ 取消';
 
-            es.addEventListener('thought', (e) => {
-                const payload = JSON.parse(e.data);
-                state.iteration = payload.data.iteration || state.iteration;
-                dom.iterationCount.textContent = String(state.iteration);
-                addBubble('thought', `思考 #${payload.data.iteration || '-'}`, payload.data.content || '');
-            });
-
-            es.addEventListener('action', (e) => {
-                const payload = JSON.parse(e.data);
-                const tool = payload.data.tool || '?';
-                const input = payload.data.input || {};
-                addBubble('action', `调用 Skill: ${tool}`,
-                    `参数：${JSON.stringify(input, null, 2).slice(0, 200)}`);
-            });
-
-            es.addEventListener('observation', (e) => {
-                const payload = JSON.parse(e.data);
-                const tool = payload.data.tool || '?';
-                const content = String(payload.data.content || '');
-                const preview = content.length > 240 ? content.slice(0, 240) + '...' : content;
-                addBubble('observation', `${tool} 返回结果`, preview);
-            });
-
-            es.addEventListener('skill_start', (e) => {
-                const payload = JSON.parse(e.data);
-                setSkillCalling(payload.data.skill);
-            });
-
-            es.addEventListener('skill_end', (e) => {
-                const payload = JSON.parse(e.data);
-                setSkillDone(payload.data.skill, payload.data.output_preview || '');
-            });
-
-            es.addEventListener('error', (e) => {
-                try {
-                    const payload = JSON.parse(e.data);
-                    addBubble('error', '错误', payload.data.message || '未知错误');
-                } catch (_) {
-                    // 网络错误等
-                }
-            });
-
-            es.addEventListener('final_answer', (e) => {
-                const payload = JSON.parse(e.data);
-                const content = payload.data.content || '';
-                if (content === '__DONE__') {
-                    es.close();
-                    state.eventSource = null;
-                    handleStreamEnd('done', '完成');
-                    return;
-                }
-                state.finalReport = content;
-                dom.reportPanel.innerHTML = '<div class="report-content">' + renderMarkdown(content) + '</div>';
-                dom.copyBtn.style.display = 'inline-block';
-            });
-
-            es.onerror = (e) => {
-                if (state.eventSource) {
-                    state.eventSource.close();
-                    state.eventSource = null;
-                    handleStreamEnd('error', '连接中断');
-                }
-            };
+    if (type === 'success') {
+        dom.submitBtn.disabled = false;
+        dom.submitText.innerHTML = '📝 重新编辑';
+        setFooter(`审核完成，耗时 ${sec} 秒`, null);
+    } else if (type === 'cancelled') {
+        if (state.typewriterTimer) { clearInterval(state.typewriterTimer); state.typewriterTimer = null; }
+        state.finalReport = '';
+        dom.copyBtn.style.display = 'none';
+        dom.reportContent.innerHTML = `<div class="empty-state"><span class="empty-icon">⏸</span><span class="empty-title" style="color:var(--warning)">审核已被用户取消</span></div>`;
+        setStatus(`⏸ 已取消（耗时 ${sec} 秒）`, 'cancelled');
+        setFooter(`已取消，耗时 ${sec} 秒`, 'cancelled');
+        dom.submitBtn.disabled = false;
+        dom.submitText.innerHTML = '📝 重新编辑';
+    } else if (type === 'error') {
+        setStatus(msg, 'error');
+        setFooter('发生错误', 'error');
+        if (!state.finalReport) {
+            dom.reportContent.innerHTML = `<div class="empty-state"><span class="empty-icon">⚠️</span><span class="empty-title" style="color:var(--danger)">${escapeHtml(msg)}</span></div>`;
         }
+        dom.submitBtn.disabled = false;
+        dom.submitText.innerHTML = '📝 重新编辑';
+    }
+}
 
-        function handleStreamEnd(stateType, statusText) {
-            stopTimer();
-            setStatus(stateType, statusText);
-            dom.sendBtn.disabled = false;
-        }
+// ============================================================
+// Copy
+// ============================================================
+dom.copyBtn.addEventListener('click', async () => {
+    if (!state.finalReport) return;
+    const ok = () => {
+        dom.copyBtn.textContent = '✓ 已复制';
+        setTimeout(() => { dom.copyBtn.textContent = '📋 复制'; }, 1500);
+    };
+    try {
+        await navigator.clipboard.writeText(state.finalReport);
+        ok();
+    } catch (_) {
+        const ta = document.createElement('textarea');
+        ta.value = state.finalReport;
+        ta.style.position = 'fixed'; ta.style.opacity = '0';
+        document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); } catch (e) {}
+        document.body.removeChild(ta);
+        ok();
+    }
+});
 
-        // ========== 复制报告 ==========
-        dom.copyBtn.addEventListener('click', async () => {
-            if (!state.finalReport) return;
-            try {
-                await navigator.clipboard.writeText(state.finalReport);
-                dom.copyBtn.textContent = '✓ 已复制';
-                setTimeout(() => { dom.copyBtn.textContent = '📋 复制报告'; }, 1500);
-            } catch (e) {
-                // 兜底
-                const ta = document.createElement('textarea');
-                ta.value = state.finalReport;
-                document.body.appendChild(ta);
-                ta.select();
-                document.execCommand('copy');
-                document.body.removeChild(ta);
-                dom.copyBtn.textContent = '✓ 已复制';
-                setTimeout(() => { dom.copyBtn.textContent = '📋 复制报告'; }, 1500);
-            }
-        });
+// ============================================================
+// Button bindings
+// ============================================================
+dom.submitBtn.addEventListener('click', submitReview);
+dom.cancelBtn.addEventListener('click', cancelReview);
+dom.inputArea.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+        e.preventDefault();
+        if (!state.isRunning && state.mode === 'edit') submitReview();
+    }
+});
 
-        // ========== 事件绑定 ==========
-        dom.sendBtn.addEventListener('click', sendMessage);
-        dom.input.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter' && !e.isComposing) {
-                e.preventDefault();
-                sendMessage();
-            }
-        });
-
-        // ========== 初始化 ==========
-        window.addEventListener('DOMContentLoaded', () => {
-            setStatus('ready', '就绪');
-            loadSkills();
-        });
-    </script>
+// ============================================================
+// Init
+// ============================================================
+window.addEventListener('DOMContentLoaded', () => {
+    setFooter('就绪', null);
+    setMode('edit');   // 默认进入编辑态
+});
+</script>
 </body>
 </html>
