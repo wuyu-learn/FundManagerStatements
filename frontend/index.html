@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 智能分析系统</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        :root {
+            --bg-primary: #0f172a;
+            --bg-card: #1e293b;
+            --accent: #06b6d4;
+        }
+
+        html, body {
+            background-color: var(--bg-primary);
+            color: #e2e8f0;
+            font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        .app-grid {
+            display: grid;
+            grid-template-rows: auto 1fr auto;
+            height: 100vh;
+        }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 16px;
+            padding: 16px;
+            overflow: hidden;
+            min-height: 0;
+        }
+
+        .panel {
+            background-color: var(--bg-card);
+            border-radius: 12px;
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            overflow: hidden;
+            border: 1px solid rgba(148, 163, 184, 0.1);
+        }
+
+        .panel-header {
+            padding: 12px 16px;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+            font-weight: 600;
+            color: #06b6d4;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .panel-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            min-height: 0;
+        }
+
+        .panel-body::-webkit-scrollbar { width: 6px; }
+        .panel-body::-webkit-scrollbar-track { background: transparent; }
+        .panel-body::-webkit-scrollbar-thumb {
+            background-color: rgba(148, 163, 184, 0.3);
+            border-radius: 3px;
+        }
+
+        /* Bubble Styles */
+        .bubble {
+            margin-bottom: 12px;
+            padding: 12px 14px;
+            border-radius: 10px;
+            border-left: 3px solid;
+            animation: slideIn 0.3s ease-out;
+            position: relative;
+        }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .bubble-thought {
+            background-color: rgba(59, 130, 246, 0.1);
+            border-left-color: #3b82f6;
+        }
+        .bubble-action {
+            background-color: rgba(249, 115, 22, 0.1);
+            border-left-color: #f97316;
+        }
+        .bubble-observation {
+            background-color: rgba(34, 197, 94, 0.1);
+            border-left-color: #22c55e;
+        }
+        .bubble-error {
+            background-color: rgba(239, 68, 68, 0.12);
+            border-left-color: #ef4444;
+        }
+        .bubble-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 6px;
+            opacity: 0.9;
+        }
+        .bubble-content {
+            font-size: 13px;
+            line-height: 1.6;
+            color: #e2e8f0;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        .bubble-meta {
+            font-size: 11px;
+            margin-top: 6px;
+            color: #94a3b8;
+            font-family: ui-monospace, SFMono-Regular, monospace;
+            background: rgba(15, 23, 42, 0.4);
+            padding: 6px 8px;
+            border-radius: 4px;
+            max-height: 120px;
+            overflow-y: auto;
+        }
+
+        /* Typing Cursor */
+        .typing::after {
+            content: '▊';
+            color: var(--accent);
+            animation: blink 1s steps(2, start) infinite;
+            margin-left: 2px;
+        }
+        @keyframes blink {
+            to { visibility: hidden; }
+        }
+
+        /* Skill Cards */
+        .skill-card {
+            background-color: rgba(15, 23, 42, 0.5);
+            border: 2px solid rgba(148, 163, 184, 0.2);
+            border-radius: 10px;
+            padding: 12px 14px;
+            margin-bottom: 10px;
+            transition: all 0.3s ease;
+        }
+        .skill-card.calling {
+            border-color: var(--accent);
+            box-shadow: 0 0 0 0 rgba(6, 182, 212, 0.4);
+            animation: pulse-cyan 1.5s infinite;
+        }
+        @keyframes pulse-cyan {
+            0% { box-shadow: 0 0 0 0 rgba(6, 182, 212, 0.5); }
+            70% { box-shadow: 0 0 0 8px rgba(6, 182, 212, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(6, 182, 212, 0); }
+        }
+        .skill-card.done {
+            border-color: #22c55e;
+        }
+        .skill-card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 4px;
+        }
+        .skill-card-name {
+            font-size: 13px;
+            font-weight: 600;
+            color: #f1f5f9;
+        }
+        .skill-card-status {
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 10px;
+        }
+        .skill-card.idle .skill-card-status {
+            background: rgba(148, 163, 184, 0.2);
+            color: #94a3b8;
+        }
+        .skill-card.calling .skill-card-status {
+            background: rgba(6, 182, 212, 0.2);
+            color: var(--accent);
+        }
+        .skill-card.done .skill-card-status {
+            background: rgba(34, 197, 94, 0.2);
+            color: #22c55e;
+        }
+        .skill-card-desc {
+            font-size: 11px;
+            color: #94a3b8;
+            line-height: 1.5;
+            margin-bottom: 6px;
+        }
+        .skill-card-preview {
+            font-size: 11px;
+            font-family: ui-monospace, SFMono-Regular, monospace;
+            background: rgba(15, 23, 42, 0.6);
+            padding: 6px 8px;
+            border-radius: 4px;
+            margin-top: 6px;
+            max-height: 80px;
+            overflow-y: auto;
+            color: #cbd5e1;
+            display: none;
+        }
+        .skill-card.done .skill-card-preview {
+            display: block;
+        }
+
+        /* Final Report */
+        .report-placeholder {
+            color: #64748b;
+            text-align: center;
+            padding: 40px 16px;
+            font-size: 13px;
+        }
+        .report-content {
+            font-size: 14px;
+            line-height: 1.8;
+            color: #e2e8f0;
+        }
+        .report-content h1, .report-content h2, .report-content h3 {
+            color: var(--accent);
+            margin-top: 16px;
+            margin-bottom: 10px;
+            font-weight: 700;
+        }
+        .report-content h1 { font-size: 20px; }
+        .report-content h2 { font-size: 17px; }
+        .report-content h3 { font-size: 15px; }
+        .report-content strong { color: #f8fafc; font-weight: 600; }
+        .report-content p { margin-bottom: 10px; }
+        .report-content ul, .report-content ol { padding-left: 22px; margin-bottom: 10px; }
+        .report-content li { margin-bottom: 4px; }
+
+        /* Header bar */
+        .header-bar {
+            background-color: var(--bg-card);
+            padding: 14px 20px;
+            border-bottom: 1px solid rgba(148, 163, 184, 0.1);
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-shrink: 0;
+        }
+        .header-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: #f1f5f9;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .header-input {
+            flex: 1;
+            padding: 8px 14px;
+            background-color: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+            border-radius: 8px;
+            color: #e2e8f0;
+            font-size: 13px;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        .header-input:focus {
+            border-color: var(--accent);
+        }
+        .send-btn {
+            padding: 8px 20px;
+            background-color: var(--accent);
+            color: #0f172a;
+            font-weight: 600;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: background-color 0.2s;
+        }
+        .send-btn:hover { background-color: #0891b2; }
+        .send-btn:disabled {
+            background-color: rgba(148, 163, 184, 0.3);
+            color: #94a3b8;
+            cursor: not-allowed;
+        }
+        .copy-btn {
+            padding: 4px 12px;
+            background-color: rgba(6, 182, 212, 0.15);
+            color: var(--accent);
+            border: 1px solid rgba(6, 182, 212, 0.4);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: background-color 0.2s;
+        }
+        .copy-btn:hover { background-color: rgba(6, 182, 212, 0.25); }
+
+        /* Footer */
+        .footer-bar {
+            background-color: var(--bg-card);
+            padding: 8px 20px;
+            border-top: 1px solid rgba(148, 163, 184, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12px;
+            color: #94a3b8;
+            flex-shrink: 0;
+        }
+        .status-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 6px;
+            background-color: #64748b;
+        }
+        .status-dot.ready { background-color: #22c55e; }
+        .status-dot.running { background-color: var(--accent); animation: pulse-cyan 1.5s infinite; }
+        .status-dot.done { background-color: #22c55e; }
+        .status-dot.error { background-color: #ef4444; }
+    </style>
+</head>
+<body>
+    <div class="app-grid">
+        <!-- Header Bar -->
+        <div class="header-bar">
+            <div class="header-title">
+                <span>🤖</span><span>AI 智能分析系统</span>
+            </div>
+            <input id="userInput" class="header-input" type="text"
+                   placeholder="请输入您要分析的问题，例如：分析最近的市场趋势..."
+                   autocomplete="off">
+            <button id="sendBtn" class="send-btn">发送 ▶</button>
+        </div>
+
+        <!-- Main Three Columns -->
+        <div class="main-grid">
+            <!-- Left: Agent Thinking -->
+            <div class="panel">
+                <div class="panel-header">
+                    <span>🧠</span><span>Agent 思考流</span>
+                </div>
+                <div id="thinkingPanel" class="panel-body">
+                    <div class="report-placeholder">
+                        等待用户输入...<br>Agent 推理过程将实时显示在这里
+                    </div>
+                </div>
+            </div>
+
+            <!-- Middle: Skill Status -->
+            <div class="panel">
+                <div class="panel-header">
+                    <span>🔧</span><span>Skill 状态面板</span>
+                </div>
+                <div id="skillPanel" class="panel-body">
+                    <div class="report-placeholder">正在加载已注册 Skill ...</div>
+                </div>
+            </div>
+
+            <!-- Right: Final Report -->
+            <div class="panel">
+                <div class="panel-header" style="justify-content: space-between;">
+                    <span style="display: flex; align-items: center; gap: 8px;"><span>📊</span><span>最终分析报告</span></span>
+                    <button id="copyBtn" class="copy-btn" style="display: none;">📋 复制报告</button>
+                </div>
+                <div id="reportPanel" class="panel-body">
+                    <div class="report-placeholder">
+                        待 Agent 完成全部分析后<br>最终报告将展示在这里
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer Status Bar -->
+        <div class="footer-bar">
+            <div>
+                <span id="statusDot" class="status-dot ready"></span>
+                <span id="statusText">就绪</span>
+            </div>
+            <div>
+                耗时：<span id="elapsedTime">0.0s</span> ·
+                迭代次数：<span id="iterationCount">0</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ========== 状态变量 ==========
+        const state = {
+            sessionId: null,
+            eventSource: null,
+            startTime: null,
+            timerInterval: null,
+            iteration: 0,
+            skillElements: {},   // skill_name => DOM element
+            finalReport: '',
+        };
+
+        // ========== DOM 引用 ==========
+        const dom = {
+            input: document.getElementById('userInput'),
+            sendBtn: document.getElementById('sendBtn'),
+            thinkingPanel: document.getElementById('thinkingPanel'),
+            skillPanel: document.getElementById('skillPanel'),
+            reportPanel: document.getElementById('reportPanel'),
+            copyBtn: document.getElementById('copyBtn'),
+            statusDot: document.getElementById('statusDot'),
+            statusText: document.getElementById('statusText'),
+            elapsedTime: document.getElementById('elapsedTime'),
+            iterationCount: document.getElementById('iterationCount'),
+        };
+
+        // ========== 工具函数 ==========
+        function escapeHtml(str) {
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function setStatus(state_, text) {
+            dom.statusDot.className = 'status-dot ' + state_;
+            dom.statusText.textContent = text;
+        }
+
+        function clearPanel(panel) {
+            panel.innerHTML = '';
+        }
+
+        function scrollToBottom(panel) {
+            panel.scrollTop = panel.scrollHeight;
+        }
+
+        // ========== 简易 Markdown 渲染 ==========
+        function renderMarkdown(md) {
+            let html = escapeHtml(md);
+            // headers
+            html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+            html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+            html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+            // bold
+            html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+            // unordered list
+            html = html.replace(/(?:^|\n)(\s*)[-*] (.+)/g, (_, indent, item) => `\n${indent}<li>${item}</li>`);
+            html = html.replace(/(<li>[\s\S]*?<\/li>(\n<li>[\s\S]*?<\/li>)*)/g, '<ul>$1</ul>');
+            // paragraphs
+            const lines = html.split(/\n{2,}/);
+            html = lines.map(line => {
+                const t = line.trim();
+                if (!t) return '';
+                if (t.startsWith('<h') || t.startsWith('<ul') || t.startsWith('<li')) return t;
+                return '<p>' + t.replace(/\n/g, '<br>') + '</p>';
+            }).join('\n');
+            return html;
+        }
+
+        // ========== 打字机效果 ==========
+        function typeText(element, text, speed = 18) {
+            element.classList.add('typing');
+            element.textContent = '';
+            let i = 0;
+            return new Promise(resolve => {
+                const tick = () => {
+                    if (i < text.length) {
+                        element.textContent += text[i++];
+                        setTimeout(tick, speed);
+                    } else {
+                        element.classList.remove('typing');
+                        resolve();
+                    }
+                };
+                tick();
+            });
+        }
+
+        // ========== 加载 Skill 列表 ==========
+        async function loadSkills() {
+            try {
+                const resp = await fetch('/api/skills');
+                const skills = await resp.json();
+                clearPanel(dom.skillPanel);
+                if (!skills.length) {
+                    dom.skillPanel.innerHTML = '<div class="report-placeholder">暂无已注册 Skill</div>';
+                    return;
+                }
+                skills.forEach(skill => {
+                    const card = document.createElement('div');
+                    card.className = 'skill-card idle';
+                    card.dataset.skill = skill.name;
+                    card.innerHTML = `
+                        <div class="skill-card-header">
+                            <div class="skill-card-name">${escapeHtml(skill.name)}</div>
+                            <div class="skill-card-status">待机</div>
+                        </div>
+                        <div class="skill-card-desc">${escapeHtml(skill.description || '')}</div>
+                        <div class="skill-card-preview"></div>
+                    `;
+                    dom.skillPanel.appendChild(card);
+                    state.skillElements[skill.name] = card;
+                });
+            } catch (e) {
+                dom.skillPanel.innerHTML = `<div class="report-placeholder" style="color: #ef4444;">加载 Skill 失败：${escapeHtml(e.message)}</div>`;
+            }
+        }
+
+        // ========== 添加 Bubble ==========
+        function addBubble(type, headerText, contentText, meta) {
+            // 移除占位符
+            const placeholder = dom.thinkingPanel.querySelector('.report-placeholder');
+            if (placeholder) placeholder.remove();
+
+            const icons = {
+                thought: '💭',
+                action: '⚡',
+                observation: '👁',
+                error: '❌',
+            };
+            const bubble = document.createElement('div');
+            bubble.className = `bubble bubble-${type}`;
+            const headerHtml = `<div class="bubble-header"><span>${icons[type] || '•'}</span><span>${escapeHtml(headerText)}</span></div>`;
+            const contentSpan = document.createElement('div');
+            contentSpan.className = 'bubble-content';
+            const metaHtml = meta ? `<div class="bubble-meta">${escapeHtml(meta)}</div>` : '';
+            bubble.innerHTML = headerHtml;
+            bubble.appendChild(contentSpan);
+            if (meta) {
+                const metaDiv = document.createElement('div');
+                metaDiv.className = 'bubble-meta';
+                metaDiv.textContent = meta;
+                bubble.appendChild(metaDiv);
+            }
+            dom.thinkingPanel.appendChild(bubble);
+            scrollToBottom(dom.thinkingPanel);
+
+            if (type === 'thought') {
+                typeText(contentSpan, contentText).then(() => scrollToBottom(dom.thinkingPanel));
+            } else {
+                contentSpan.textContent = contentText;
+            }
+            return bubble;
+        }
+
+        // ========== Skill 卡片状态切换 ==========
+        function setSkillCalling(skillName) {
+            const card = state.skillElements[skillName];
+            if (!card) return;
+            card.classList.remove('idle', 'done');
+            card.classList.add('calling');
+            card.querySelector('.skill-card-status').textContent = '调用中...';
+            card.querySelector('.skill-card-preview').textContent = '';
+        }
+
+        function setSkillDone(skillName, preview) {
+            const card = state.skillElements[skillName];
+            if (!card) return;
+            card.classList.remove('idle', 'calling');
+            card.classList.add('done');
+            card.querySelector('.skill-card-status').textContent = '✓ 完成';
+            const previewEl = card.querySelector('.skill-card-preview');
+            previewEl.textContent = preview || '';
+        }
+
+        function resetAllSkillCards() {
+            for (const name in state.skillElements) {
+                const card = state.skillElements[name];
+                card.classList.remove('calling', 'done');
+                card.classList.add('idle');
+                card.querySelector('.skill-card-status').textContent = '待机';
+                card.querySelector('.skill-card-preview').textContent = '';
+            }
+        }
+
+        // ========== 计时器 ==========
+        function startTimer() {
+            state.startTime = Date.now();
+            state.timerInterval = setInterval(() => {
+                const elapsed = ((Date.now() - state.startTime) / 1000).toFixed(1);
+                dom.elapsedTime.textContent = elapsed + 's';
+            }, 100);
+        }
+
+        function stopTimer() {
+            if (state.timerInterval) {
+                clearInterval(state.timerInterval);
+                state.timerInterval = null;
+            }
+        }
+
+        // ========== 发送 ==========
+        async function sendMessage() {
+            const message = dom.input.value.trim();
+            if (!message) return;
+            if (state.eventSource) {
+                state.eventSource.close();
+                state.eventSource = null;
+            }
+
+            // 重置 UI
+            clearPanel(dom.thinkingPanel);
+            clearPanel(dom.reportPanel);
+            dom.reportPanel.innerHTML = '<div class="report-placeholder">分析进行中，请稍候...</div>';
+            dom.copyBtn.style.display = 'none';
+            resetAllSkillCards();
+            state.finalReport = '';
+            state.iteration = 0;
+            dom.iterationCount.textContent = '0';
+            dom.sendBtn.disabled = true;
+            setStatus('running', '分析中...');
+            startTimer();
+
+            try {
+                const resp = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message }),
+                });
+                const data = await resp.json();
+                if (!data.session_id) {
+                    throw new Error('未返回 session_id');
+                }
+                state.sessionId = data.session_id;
+                connectSSE(data.session_id);
+            } catch (e) {
+                addBubble('error', '请求失败', e.message);
+                handleStreamEnd('error', '请求失败');
+            }
+        }
+
+        // ========== SSE 连接 ==========
+        function connectSSE(sessionId) {
+            const es = new EventSource(`/api/stream/${sessionId}`);
+            state.eventSource = es;
+
+            es.addEventListener('thought', (e) => {
+                const payload = JSON.parse(e.data);
+                state.iteration = payload.data.iteration || state.iteration;
+                dom.iterationCount.textContent = String(state.iteration);
+                addBubble('thought', `思考 #${payload.data.iteration || '-'}`, payload.data.content || '');
+            });
+
+            es.addEventListener('action', (e) => {
+                const payload = JSON.parse(e.data);
+                const tool = payload.data.tool || '?';
+                const input = payload.data.input || {};
+                addBubble('action', `调用 Skill: ${tool}`,
+                    `参数：${JSON.stringify(input, null, 2).slice(0, 200)}`);
+            });
+
+            es.addEventListener('observation', (e) => {
+                const payload = JSON.parse(e.data);
+                const tool = payload.data.tool || '?';
+                const content = String(payload.data.content || '');
+                const preview = content.length > 240 ? content.slice(0, 240) + '...' : content;
+                addBubble('observation', `${tool} 返回结果`, preview);
+            });
+
+            es.addEventListener('skill_start', (e) => {
+                const payload = JSON.parse(e.data);
+                setSkillCalling(payload.data.skill);
+            });
+
+            es.addEventListener('skill_end', (e) => {
+                const payload = JSON.parse(e.data);
+                setSkillDone(payload.data.skill, payload.data.output_preview || '');
+            });
+
+            es.addEventListener('error', (e) => {
+                try {
+                    const payload = JSON.parse(e.data);
+                    addBubble('error', '错误', payload.data.message || '未知错误');
+                } catch (_) {
+                    // 网络错误等
+                }
+            });
+
+            es.addEventListener('final_answer', (e) => {
+                const payload = JSON.parse(e.data);
+                const content = payload.data.content || '';
+                if (content === '__DONE__') {
+                    es.close();
+                    state.eventSource = null;
+                    handleStreamEnd('done', '完成');
+                    return;
+                }
+                state.finalReport = content;
+                dom.reportPanel.innerHTML = '<div class="report-content">' + renderMarkdown(content) + '</div>';
+                dom.copyBtn.style.display = 'inline-block';
+            });
+
+            es.onerror = (e) => {
+                if (state.eventSource) {
+                    state.eventSource.close();
+                    state.eventSource = null;
+                    handleStreamEnd('error', '连接中断');
+                }
+            };
+        }
+
+        function handleStreamEnd(stateType, statusText) {
+            stopTimer();
+            setStatus(stateType, statusText);
+            dom.sendBtn.disabled = false;
+        }
+
+        // ========== 复制报告 ==========
+        dom.copyBtn.addEventListener('click', async () => {
+            if (!state.finalReport) return;
+            try {
+                await navigator.clipboard.writeText(state.finalReport);
+                dom.copyBtn.textContent = '✓ 已复制';
+                setTimeout(() => { dom.copyBtn.textContent = '📋 复制报告'; }, 1500);
+            } catch (e) {
+                // 兜底
+                const ta = document.createElement('textarea');
+                ta.value = state.finalReport;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+                dom.copyBtn.textContent = '✓ 已复制';
+                setTimeout(() => { dom.copyBtn.textContent = '📋 复制报告'; }, 1500);
+            }
+        });
+
+        // ========== 事件绑定 ==========
+        dom.sendBtn.addEventListener('click', sendMessage);
+        dom.input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.isComposing) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        // ========== 初始化 ==========
+        window.addEventListener('DOMContentLoaded', () => {
+            setStatus('ready', '就绪');
+            loadSkills();
+        });
+    </script>
+</body>
+</html>
