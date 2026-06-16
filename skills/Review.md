@@ -1,8 +1,12 @@
 ---
 name: Review
 description: 审查基金经理评述（带[p-s]编号文本），检测两类问题：过度业务承诺 与 错别字/文字错误。每条问题必须带 global_s_id 精准回引句子
+metadata:
+  short-description: 基金经理评述合规与文字质量审核
+  runtime: jinja2_prompt_tool
 input_schema:
   type: object
+  additionalProperties: false
   properties:
     numbered_text:
       type: string
@@ -15,6 +19,7 @@ input_schema:
     - doc_id
 output_schema:
   type: object
+  additionalProperties: false
   properties:
     summary:
       type: string
@@ -24,6 +29,7 @@ output_schema:
       description: 违规项明细列表
       items:
         type: object
+        additionalProperties: false
         properties:
           global_s_id:
             type: string
@@ -33,6 +39,7 @@ output_schema:
             description: 命中违规的原文片段（必须是该句子的原文）
           category:
             type: string
+            enum: [保本承诺, 收益承诺, 确定性预测, 业绩排名, 推荐买入, 其它诱导, 错别字]
             description: 问题类型（保本承诺/收益承诺/确定性预测/业绩排名/推荐买入/其它诱导/错别字）
           severity:
             type: string

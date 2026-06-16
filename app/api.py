@@ -1,24 +1,26 @@
+import asyncio
 import os
 import uuid
-import asyncio
-from dotenv import load_dotenv
-load_dotenv()
 
+from dotenv import load_dotenv
 from fastapi import FastAPI
-from fastapi.responses import HTMLResponse, StreamingResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
-from agent.orchestrator import AgentOrchestrator
 from agent.event_stream import EventEmitter
-from mcp_server.skill_loader import load_all_skills
-from processor import process_text, format_to_numbered_text
+from agent.orchestrator import AgentOrchestrator
+from runtime.skills import load_all_skills
+from runtime.skills.assets import load_skill_script
+from runtime.storage import process_text
+
+load_dotenv()
 
 app = FastAPI(title="AI Demo System")
 
-# session_id -> (emitter, agent_task)，保留 task 引用以便 /api/cancel 调 task.cancel()
 sessions: dict[str, tuple[EventEmitter, asyncio.Task]] = {}
 
-FRONTEND_PATH = os.path.join(os.path.dirname(__file__), "..", "frontend", "index.html")
+FRONTEND_PATH = os.path.join(os.path.dirname(__file__), "web", "index.html")
+_fund_review_splitter = load_skill_script("fund-review", "splitter.py")
 
 
 class ChatRequest(BaseModel):
@@ -35,12 +37,10 @@ async def index():
 async def chat(request: ChatRequest):
     raw_text = request.message or ""
 
-    # P2 数据流入：原文 → doc 树 + 编号文本
     doc = process_text(raw_text)
-    numbered_text = format_to_numbered_text(doc)
+    numbered_text = _fund_review_splitter.format_to_numbered_text(doc)
     doc_id = doc["doc_id"]
 
-    # 给 Agent 的指令性消息：明确告知有 [p-s] 编号 + 必须用完整 global_s_id 回引
     agent_message = (
         f"请审核以下基金经理评述。\n"
         f"文档 ID（doc_id）: {doc_id}\n"
@@ -70,7 +70,6 @@ async def chat(request: ChatRequest):
         "doc_id": doc_id,
         "paragraph_count": len(doc["paragraphs"]),
         "sentence_count": sum(len(p["sentences"]) for p in doc["paragraphs"]),
-        # P4：前端 col1 直接靠 doc.full_text + paragraphs/sentences 偏移渲染句子级 span
         "doc": doc,
     })
 
@@ -130,3 +129,4 @@ async def list_skills():
         }
         for s in skills
     ])
+

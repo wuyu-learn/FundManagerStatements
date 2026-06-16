@@ -1,17 +1,11 @@
 import os
-from dataclasses import dataclass
+
 import yaml
 
-SKILLS_DIR = os.path.join(os.path.dirname(__file__), "..", "skills")
+from .definitions import SkillDefinition
 
-
-@dataclass
-class SkillDefinition:
-    name: str
-    description: str
-    input_schema: dict
-    output_schema: dict
-    prompt_template: str
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+SKILLS_DIR = os.path.join(ROOT_DIR, "skills")
 
 
 def load_skill_file(filepath: str) -> tuple[dict, str]:
@@ -46,3 +40,4 @@ def load_all_skills() -> list[SkillDefinition]:
             )
             skills.append(skill)
     return skills
+

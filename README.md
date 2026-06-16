@@ -5,7 +5,7 @@
 默认运行链路：
 
 ```
-API Server → Agent → skill_runtime → skills/Review.md → LLM
+App API → Agent → runtime/skills → skills/Review.md → LLM
 ```
 
 MCP Server 仍然保留，但默认不启动。需要把 Skill 作为标准 MCP tool 暴露给外部客户端时，
@@ -18,7 +18,7 @@ ENABLE_MCP_SERVER=true
 开启后可选链路为：
 
 ```
-外部 MCP Client → MCP Server → skill_runtime → skills/Review.md → LLM
+外部 MCP Client → runtime/mcp → runtime/skills → skills/Review.md → LLM
 ```
 
 ## 环境要求
@@ -46,8 +46,38 @@ ENABLE_MCP_SERVER=true
 - Mac/Linux：在终端按 `Ctrl+C`，或运行 `./stop.sh`
 
 ## 新增 Skill
-在 `skills/` 目录参照 `example_skill.md` 格式新建 `.md` 文件，
-填写 YAML Front Matter 元信息和 Prompt 正文，重启服务即可自动注册。
+在 `skills/` 目录新建 `.md` 文件，文件必须包含 YAML Front Matter 和 Prompt 正文。
+Front Matter 至少包含：
+
+```yaml
+---
+name: Example
+description: 简短说明这个 Skill 的用途、输入要求和输出目标
+input_schema:
+  type: object
+  properties: {}
+output_schema:
+  type: object
+  properties: {}
+---
+```
+
+当前项目的 Skill 是项目内自定义格式：`runtime/skills/loader.py` 会读取 `skills/*.md`，
+并把 `name`、`description`、`input_schema`、`output_schema` 和正文 Prompt 注册为可执行工具。
+如果开启 MCP Server，这些 Skill 还会按 `input_schema` 暴露为 MCP tool。
+
+仓库里也保留了标准技能包目录形态的 Skill 示例：`skills/fund-review/SKILL.md`。
+它用于沉淀可复用的技能说明、文本切分脚本、详细规则和确定性校验脚本；当前 API 链路仍以
+`skills/Review.md` 作为运行入口。
+
+分层约定：
+- `app/` 负责 HTTP API、用户会话和前端页面入口。
+- `agent/` 负责意图识别、计划编排、事件流和执行轨迹。
+- `runtime/llm/` 负责模型客户端。
+- `runtime/skills/` 负责 Skill 定义、发现、执行和技能包资源加载。
+- `runtime/mcp/` 负责把 Skill 暴露为可选 MCP tool。
+- `runtime/storage/` 负责运行期缓存，例如 `data/raw_docs`。
+- `skills/fund-review/` 负责基金评述审核相关能力，包括切句编号、审核规则和输出校验。
 
 ## 日志查看
 - MCP Server 日志：`logs/mcp_server.log`（仅 `ENABLE_MCP_SERVER=true` 时生成）

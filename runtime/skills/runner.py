@@ -1,22 +1,11 @@
 import json
-import os
 
-from dotenv import load_dotenv
 from jinja2 import Template
-from openai import AsyncOpenAI
 
-from config import get_llm_settings
-from mcp_server.skill_loader import SkillDefinition, load_all_skills
+from runtime.llm import get_async_openai_client, get_model_name
+from .definitions import SkillDefinition
+from .loader import load_all_skills
 
-load_dotenv()
-
-LLM_SETTINGS = get_llm_settings()
-LLM_MODEL = LLM_SETTINGS["model"]
-
-openai_client = AsyncOpenAI(
-    api_key=LLM_SETTINGS["api_key"],
-    base_url=LLM_SETTINGS["base_url"],
-)
 
 FALLBACK_PROMPT = """
 你是一个 AI 助手。当前 Skill 的 Prompt 尚未配置，请根据以下输入生成合理的 mock 响应。
@@ -31,8 +20,8 @@ def is_empty_template(template_str: str) -> bool:
 
 
 async def call_llm_json(prompt: str) -> dict:
-    response = await openai_client.chat.completions.create(
-        model=LLM_MODEL,
+    response = await get_async_openai_client().chat.completions.create(
+        model=get_model_name(),
         messages=[{"role": "user", "content": prompt}],
         response_format={"type": "json_object"},
     )
@@ -57,3 +46,4 @@ async def run_skill(skill_name: str, inputs: dict) -> str:
     if skill is None:
         raise ValueError(f"Skill not found: {skill_name}")
     return await run_skill_by_definition(skill, inputs)
+

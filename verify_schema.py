@@ -10,7 +10,7 @@ import json
 import sys
 
 # Importing the module triggers `register_skills()` which registers tools on mcp.
-import mcp_server.server as server
+import runtime.mcp.server as server
 
 
 def _list_registered_tools():

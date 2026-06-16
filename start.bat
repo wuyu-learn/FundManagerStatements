@@ -79,7 +79,7 @@ if /i "%ENABLE_MCP_SERVER%"=="true" (
     )
     pip install -r requirements-mcp.txt -q
     echo [3/4] Starting MCP Server optional external tool endpoint...
-    start /b "" python -m mcp_server.server > logs\mcp_server.log 2>&1
+    start /b "" python -m runtime.mcp.server > logs\mcp_server.log 2>&1
     timeout /t 3 /nobreak >nul
 ) else (
     echo [3/4] Skipping MCP Server. Agent calls skills directly.
@@ -87,7 +87,7 @@ if /i "%ENABLE_MCP_SERVER%"=="true" (
 
 REM Start API Server
 echo [4/4] Starting API Server...
-start /b "" uvicorn api.app:app --host 127.0.0.1 --port %API_PORT% > logs\api_server.log 2>&1
+start /b "" uvicorn app.api:app --host 127.0.0.1 --port %API_PORT% > logs\api_server.log 2>&1
 timeout /t 2 /nobreak >nul
 
 REM Open browser

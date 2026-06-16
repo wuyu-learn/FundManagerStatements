@@ -1,29 +1,24 @@
 import json
-import os
 import asyncio
 from typing import Optional
 
 from dotenv import load_dotenv
-from openai import AsyncOpenAI
 
-from config import get_llm_settings
 from .event_stream import EventEmitter, EventType
 from .intents import IntentRecognizer, IntentResult
 from .planner import PlanStep, TaskPlan, TaskPlanner
 from .prompts import FINAL_REPORT_SYSTEM_PROMPT
 from .trace import AgentTrace
-from .validators import ReviewObservationValidator
-from skill_runtime import run_skill
+from runtime.llm import get_async_openai_client, get_model_name
+from runtime.skills import run_skill
+from runtime.skills.assets import load_skill_script
 
 load_dotenv()
 
-LLM_SETTINGS = get_llm_settings()
-LLM_MODEL = LLM_SETTINGS["model"]
-
-openai_client = AsyncOpenAI(
-    api_key=LLM_SETTINGS["api_key"],
-    base_url=LLM_SETTINGS["base_url"],
-)
+ReviewObservationValidator = load_skill_script(
+    "fund-review",
+    "review_observation_validator.py",
+).ReviewObservationValidator
 
 
 class AgentOrchestrator:
@@ -208,8 +203,8 @@ class AgentOrchestrator:
             {"role": "user", "content": user_input},
             {"role": "user", "content": f"Observation: {observation}"},
         ]
-        response = await openai_client.chat.completions.create(
-            model=LLM_MODEL,
+        response = await get_async_openai_client().chat.completions.create(
+            model=get_model_name(),
             messages=messages,
             response_format={"type": "json_object"},
         )

@@ -101,7 +101,7 @@ trap cleanup SIGINT SIGTERM
 
 if [ "$ENABLE_MCP_SERVER" = "true" ]; then
     echo "[3/4] 启动 MCP Server（可选外部工具入口）..."
-    python3 -m mcp_server.server > logs/mcp_server.log 2>&1 &
+    python3 -m runtime.mcp.server > logs/mcp_server.log 2>&1 &
     echo $! > logs/mcp_server.pid
     sleep 3
 else
@@ -110,7 +110,7 @@ fi
 
 # 启动 API Server
 echo "[4/4] 启动 API Server..."
-uvicorn api.app:app --host 127.0.0.1 --port "$API_PORT" > logs/api_server.log 2>&1 &
+uvicorn app.api:app --host 127.0.0.1 --port "$API_PORT" > logs/api_server.log 2>&1 &
 echo $! > logs/api_server.pid
 sleep 2
 
